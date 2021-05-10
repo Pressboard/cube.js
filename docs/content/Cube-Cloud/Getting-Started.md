@@ -1,8 +1,10 @@
 ---
-title: Quickstart
-permalink: /cloud/quickstart
-category: Quickstart
+title: Getting Started
+permalink: /cloud/getting-started
+category: Cube Cloud Getting Started
 menuOrder: 1
+redirect_from:
+  - /cloud/quickstart
 ---
 
 This guide walks you through setting up Cube Cloud and connecting to your
