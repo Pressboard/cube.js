@@ -1,6 +1,13 @@
 const sql = require('mssql');
 const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
 
+const GenericTypeToMSSqlType = {
+  string: 'nvarchar(max)',
+  text: 'nvarchar(max)',
+  // should this be timezone aware? use datetimeoffset
+  timestamp: 'datetime',
+};
+
 class MSSqlDriver extends BaseDriver {
   constructor(config) {
     super();
@@ -99,12 +106,7 @@ class MSSqlDriver extends BaseDriver {
   }
 
   fromGenericType(columnType) {
-    if (columnType === 'timestamp') {
-      return 'datetime';
-    } else if (columnType === 'text') {
-      return 'nvarchar(max)';
-    }
-    return super.fromGenericType(columnType);
+    return GenericTypeToMSSqlType[columnType] || super.fromGenericType(columnType);
   }
 
   readOnly() {
