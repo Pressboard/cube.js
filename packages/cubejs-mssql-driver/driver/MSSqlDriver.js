@@ -98,6 +98,15 @@ class MSSqlDriver extends BaseDriver {
     };
   }
 
+  fromGenericType(columnType) {
+    if (columnType === 'timestamp') {
+      return 'datetime';
+    } else if (columnType === 'text') {
+      return 'nvarchar(max)';
+    }
+    return super.fromGenericType(columnType);
+  }
+
   readOnly() {
     return !!this.config.readOnly;
   }
