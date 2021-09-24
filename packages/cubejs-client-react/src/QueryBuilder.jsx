@@ -5,6 +5,7 @@ import {
   defaultOrder,
   flattenFilters,
   getQueryMembers,
+  isQueryPresent,
   moveItemInArray,
   movePivotItem,
   ResultSet
@@ -12,7 +13,7 @@ import {
 
 import QueryRenderer from './QueryRenderer.jsx';
 import CubeContext from './CubeContext';
-import { generateAnsiHTML } from './utils';
+import { generateAnsiHTML, removeEmpty } from './utils';
 
 const granularities = [
   { name: undefined, title: 'w/o grouping' },
@@ -22,6 +23,7 @@ const granularities = [
   { name: 'day', title: 'Day' },
   { name: 'week', title: 'Week' },
   { name: 'month', title: 'Month' },
+  { name: 'quarter', title: 'Quarter' },
   { name: 'year', title: 'Year' },
 ];
 
@@ -199,11 +201,12 @@ export default class QueryBuilder extends React.Component {
       const rangeSelection = member.compareDateRange
         ? { compareDateRange: member.compareDateRange }
         : { dateRange: member.dateRange };
-      return {
+        
+      return removeEmpty({
         dimension: member.dimension.name,
         granularity: member.granularity,
         ...rangeSelection,
-      };
+      });
     };
     const toFilter = (member) => ({
       member: member.member?.name || member.dimension?.name,
@@ -249,13 +252,11 @@ export default class QueryBuilder extends React.Component {
       dryRunResponse,
     } = this.state;
 
-    const flatFilters = uniqBy(
-      prop('member'),
+    const flatFilters = uniqBy((filter) => `${prop('member', filter)}${prop('operator', filter)}`,
       flattenFilters((meta && query.filters) || []).map((filter) => ({
         ...filter,
         member: filter.member || filter.dimension,
-      }))
-    );
+      })));
 
     const filters = flatFilters.map((m, i) => ({
       ...m,
@@ -307,10 +308,15 @@ export default class QueryBuilder extends React.Component {
     }
 
     const activeOrder = Array.isArray(query.order) ? Object.fromEntries(query.order) : query.order;
+    const members = [
+      ...measures,
+      ...dimensions,
+      ...timeDimensions.map(({ dimension }) => dimension)
+    ];
 
     let orderMembers = uniqBy(prop('id'), [
       // uniqBy prefers first, so these will only be added if not already in the query
-      ...measures.concat(dimensions).map(({ name, title }) => ({ id: name, title, order: activeOrder?.[name] || 'none' })),
+      ...members.map(({ name, title }) => ({ id: name, title, order: activeOrder?.[name] || 'none' })),
     ]);
 
     if (this.orderMembersOrderKeys.length !== orderMembers.length) {
@@ -476,7 +482,12 @@ export default class QueryBuilder extends React.Component {
 
     handleVizStateChange(finalState);
 
-    if (QueryRenderer.isQueryPresent(finalState.query) && finalState.missingMembers.length === 0) {
+    const shouldFetchDryRun = !equals(
+      pick(['measures', 'dimensions', 'timeDimensions'], stateQuery),
+      pick(['measures', 'dimensions', 'timeDimensions'], finalState.query)
+    );
+
+    if (shouldFetchDryRun && isQueryPresent(finalState.query) && finalState.missingMembers.length === 0) {
       try {
         const response = await this.cubejsApi().dryRun(finalState.query, {
           mutexObj: this.mutexObj,
@@ -491,7 +502,7 @@ export default class QueryBuilder extends React.Component {
         finalState.dryRunResponse = response;
 
         // deprecated
-        if (QueryRenderer.isQueryPresent(stateQuery)) {
+        if (isQueryPresent(stateQuery)) {
           runSetters({
             ...this.state,
             ...finalState,

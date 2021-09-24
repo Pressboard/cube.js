@@ -16,8 +16,28 @@ import { getEnv } from '@cubejs-backend/shared';
 
 import { HydrationMap, HydrationStream } from './HydrationStream';
 
+// eslint-disable-next-line import/order
+const util = require('snowflake-sdk/lib/util');
+
+// TODO Remove when https://github.com/snowflakedb/snowflake-connector-nodejs/pull/158 is resolved
+util.construct_hostname = (region: any, account: any) => {
+  let host;
+  if (region === 'us-west-2') {
+    region = null;
+  }
+  if (account.indexOf('.') > 0) {
+    account = account.substring(0, account.indexOf('.'));
+  }
+  if (region) {
+    host = `${account}.${region}.snowflakecomputing.com`;
+  } else {
+    host = `${account}.snowflakecomputing.com`;
+  }
+  return host;
+};
+
 type HydrationConfiguration = {
-  types: string[], toValue: (column: Column) => ((value: any) => any)|null
+  types: string[], toValue: (column: Column) => ((value: any) => any) | null
 };
 type UnloadResponse = {
   // eslint-disable-next-line camelcase
@@ -119,7 +139,7 @@ interface SnowflakeDriverOptions {
  * Similar to data in response, column_name will be COLUMN_NAME
  */
 export class SnowflakeDriver extends BaseDriver implements DriverInterface {
-  protected connection: Promise<Connection>|null = null;
+  protected connection: Promise<Connection> | null = null;
 
   protected readonly config: SnowflakeDriverOptions;
 
@@ -171,7 +191,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   /**
    * @todo Move to BaseDriver in the future?
    */
-  protected getExportBucket(): SnowflakeDriverExportBucket|undefined {
+  protected getExportBucket(): SnowflakeDriverExportBucket | undefined {
     const bucketType = getEnv('dbExportBucketType', {
       supported: ['s3', 'gcs']
     });
@@ -214,29 +234,36 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     await this.query('SELECT 1 as number');
   }
 
+  protected async initConnection() {
+    try {
+      const connection = snowflake.createConnection(this.config);
+      await new Promise(
+        (resolve, reject) => connection.connect((err, conn) => (err ? reject(err) : resolve(conn)))
+      );
+
+      await this.execute(connection, 'ALTER SESSION SET TIMEZONE = \'UTC\'', [], false);
+      await this.execute(connection, 'ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS = 600', [], false);
+
+      return connection;
+    } catch (e) {
+      this.connection = null;
+
+      throw e;
+    }
+  }
+
   protected async getConnection(): Promise<Connection> {
     if (this.connection) {
-      return this.connection;
+      const connection = await this.connection;
+
+      // Return a connection if not in a fatal state.
+      if (connection.isUp()) {
+        return connection;
+      }
     }
 
     // eslint-disable-next-line no-return-assign
-    return this.connection = (async () => {
-      try {
-        const connection = snowflake.createConnection(this.config);
-        await new Promise(
-          (resolve, reject) => connection.connect((err, conn) => (err ? reject(err) : resolve(conn)))
-        );
-
-        await this.execute(connection, 'ALTER SESSION SET TIMEZONE = \'UTC\'', [], false);
-        await this.execute(connection, 'ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS = 600', [], false);
-
-        return connection;
-      } catch (e) {
-        this.connection = null;
-
-        throw e;
-      }
-    })();
+    return this.connection = this.initConnection();
   }
 
   public async query<R = unknown>(query: string, values?: unknown[]): Promise<R> {
@@ -398,7 +425,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
     const stmt = await new Promise<Statement>((resolve, reject) => connection.execute({
       sqlText: query,
-      binds: <string[]|undefined>values,
+      binds: <string[] | undefined>values,
       fetchAsString: [
         // It's not possible to store big numbers in Number, It's a common way how to handle it in Cube.js
         'Number',
@@ -462,7 +489,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   ): Promise<R> {
     return new Promise((resolve, reject) => connection.execute({
       sqlText: query,
-      binds: <string[]|undefined>values,
+      binds: <string[] | undefined>values,
       fetchAsString: ['Number'],
       complete: (err, stmt, rows) => {
         if (err) {

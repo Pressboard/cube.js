@@ -1,14 +1,17 @@
 /* eslint-disable no-throw-literal */
 import pt from 'promise-timeout';
-import { QueryOrchestrator, ContinueWaitError, DriverFactoryByDataSource } from '@cubejs-backend/query-orchestrator';
+import {
+  QueryOrchestrator,
+  ContinueWaitError,
+  DriverFactoryByDataSource,
+  QueryOrchestratorOptions,
+} from '@cubejs-backend/query-orchestrator';
 
 import { DbTypeFn, ExternalDbTypeFn, RequestContext } from './types';
 
-interface OrchestratorApiOptions {
-  externalDriverFactory: DriverFactoryByDataSource;
+export interface OrchestratorApiOptions extends QueryOrchestratorOptions {
   contextToDbType: DbTypeFn;
   contextToExternalDbType: ExternalDbTypeFn;
-  continueWaitTimeout?: number;
   redisPrefix?: string;
 }
 
@@ -17,20 +20,13 @@ export class OrchestratorApi {
 
   protected readonly orchestrator: QueryOrchestrator;
 
-  protected readonly externalDriverFactory: DriverFactoryByDataSource;
-
   protected readonly continueWaitTimeout: number;
 
-  protected readonly contextToDbType: DbTypeFn;
-
-  protected readonly contextToExternalDbType: ExternalDbTypeFn;
-
   public constructor(
-    protected driverFactory: DriverFactoryByDataSource,
-    protected logger,
+    protected readonly driverFactory: DriverFactoryByDataSource,
+    protected readonly logger,
     protected readonly options: OrchestratorApiOptions
   ) {
-    const { externalDriverFactory, contextToDbType, contextToExternalDbType } = options;
     this.continueWaitTimeout = this.options.continueWaitTimeout || 5;
 
     this.orchestrator = new QueryOrchestrator(
@@ -39,12 +35,6 @@ export class OrchestratorApi {
       logger,
       options
     );
-
-    this.driverFactory = driverFactory;
-    this.externalDriverFactory = externalDriverFactory;
-    this.contextToDbType = contextToDbType;
-    this.contextToExternalDbType = contextToExternalDbType;
-    this.logger = logger;
   }
 
   public async executeQuery(query) {
@@ -74,14 +64,14 @@ export class OrchestratorApi {
       });
 
       const extractDbType = (response) => (
-        this.contextToDbType({
+        this.options.contextToDbType({
           ...query.context,
           dataSource: response.dataSource,
         })
       );
 
       const extractExternalDbType = (response) => (
-        this.contextToExternalDbType({
+        this.options.contextToExternalDbType({
           ...query.context,
           dataSource: response.dataSource,
         })
@@ -142,7 +132,7 @@ export class OrchestratorApi {
   public async testConnection() {
     return Promise.all([
       ...Object.keys(this.seenDataSources).map(ds => this.testDriverConnection(this.driverFactory, ds)),
-      this.testDriverConnection(this.externalDriverFactory)
+      this.testDriverConnection(this.options.externalDriverFactory)
     ]);
   }
 
@@ -150,7 +140,7 @@ export class OrchestratorApi {
     return this.orchestrator.testConnections();
   }
 
-  public async testDriverConnection(driverFn: DriverFactoryByDataSource, dataSource: string = 'default') {
+  public async testDriverConnection(driverFn?: DriverFactoryByDataSource, dataSource: string = 'default') {
     if (driverFn) {
       const driver = await driverFn(dataSource);
       await driver.testConnection();
@@ -160,12 +150,12 @@ export class OrchestratorApi {
   public async release() {
     return Promise.all([
       ...Object.keys(this.seenDataSources).map(ds => this.releaseDriver(this.driverFactory, ds)),
-      this.releaseDriver(this.externalDriverFactory),
+      this.releaseDriver(this.options.externalDriverFactory),
       this.orchestrator.cleanup()
     ]);
   }
 
-  protected async releaseDriver(driverFn, dataSource: string = 'default') {
+  protected async releaseDriver(driverFn?: DriverFactoryByDataSource, dataSource: string = 'default') {
     if (driverFn) {
       const driver = await driverFn(dataSource);
       if (driver.release) {
@@ -184,5 +174,38 @@ export class OrchestratorApi {
       preAggregationsSchema,
       context.requestId
     );
+  }
+
+  public getPreAggregationPreview(context: RequestContext, preAggregation) {
+    return this.orchestrator.getPreAggregationPreview(context.requestId, preAggregation);
+  }
+
+  public async expandPartitionsInPreAggregations(queryBody) {
+    try {
+      return await this.orchestrator.expandPartitionsInPreAggregations(queryBody);
+    } catch (err) {
+      if (err instanceof ContinueWaitError) {
+        throw {
+          error: 'Continue wait'
+        };
+      }
+      throw err;
+    }
+  }
+
+  public async getPreAggregationQueueStates() {
+    return this.orchestrator.getPreAggregationQueueStates();
+  }
+
+  public async cancelPreAggregationQueriesFromQueue(queryKeys: string[], dataSource: string) {
+    return this.orchestrator.cancelPreAggregationQueriesFromQueue(queryKeys, dataSource);
+  }
+
+  public async subscribeQueueEvents(id, callback) {
+    return this.orchestrator.subscribeQueueEvents(id, callback);
+  }
+
+  public async unSubscribeQueueEvents(id) {
+    return this.orchestrator.unSubscribeQueueEvents(id);
   }
 }

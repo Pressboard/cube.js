@@ -5,6 +5,8 @@ use crate::CubeError;
 use chrono::{SecondsFormat, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
+use std::fmt;
+use std::fmt::{Debug, Formatter};
 
 pub mod data;
 pub(crate) mod parquet;
@@ -21,18 +23,30 @@ pub enum TableValue {
     Boolean(bool),
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
+#[derive(Clone, Copy, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct TimestampValue {
     unix_nano: i64,
 }
 
 impl TimestampValue {
-    pub fn new(unix_nano: i64) -> TimestampValue {
+    pub fn new(mut unix_nano: i64) -> TimestampValue {
+        // This is a hack to workaround a mismatch between on-disk and in-memory representations.
+        // We use millisecond precision on-disk.
+        unix_nano -= unix_nano % 1000;
         TimestampValue { unix_nano }
     }
 
     pub fn get_time_stamp(&self) -> i64 {
         self.unix_nano
+    }
+}
+
+impl Debug for TimestampValue {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TimestampValue")
+            .field("unix_nano", &self.unix_nano)
+            .field("str", &self.to_string())
+            .finish()
     }
 }
 
@@ -66,7 +80,7 @@ impl Row {
     }
 
     pub fn push(&mut self, val: TableValue) {
-        &self.values.push(val);
+        self.values.push(val);
     }
 
     pub fn len(&self) -> usize {

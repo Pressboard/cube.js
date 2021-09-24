@@ -100,7 +100,7 @@ provider:
     CUBEJS_DB_USER: <YOUR_DB_USER_HERE>
     CUBEJS_DB_PASS: <YOUR_DB_PASS_HERE>
     CUBEJS_DB_PORT: <YOUR_DB_PORT_HERE>
-    REDIS_URL: <YOUR_REDIS_URL_HERE>
+    CUBEJS_REDIS_URL: <YOUR_REDIS_URL_HERE>
     CUBEJS_DB_TYPE: ${env.dbType}
     CUBEJS_API_SECRET: ${env.apiSecret}
     CUBEJS_APP: "\${self:service.name}-\${self:provider.stage}"
@@ -161,7 +161,7 @@ provider:
     CUBEJS_DB_PASS: <YOUR_DB_PASS_HERE>
     CUBEJS_DB_PORT: <YOUR_DB_PORT_HERE>
     CUBEJS_DB_BQ_PROJECT_ID: "\${self:provider.project}"
-    REDIS_URL: <YOUR_REDIS_URL_HERE>
+    CUBEJS_REDIS_URL: <YOUR_REDIS_URL_HERE>
     CUBEJS_API_SECRET: ${env.apiSecret}
     CUBEJS_APP: "\${self:service.name}-\${self:provider.stage}"
     CUBEJS_SERVERLESS_PLATFORM: "\${self:provider.name}"
@@ -243,12 +243,8 @@ services:
     ports:
       # It's better to use random port binding for 4000/3000 ports
       # without it you will not able to start multiple projects inside docker
-      # - 4000
-      # - 3000
-      # 4000 is a port for Cube.js API
-      - 4000:4000
-      # 3000 is a port for Playground web-server
-      - 3000:3000
+      - 4000:4000  # Cube.js API and Developer Playground
+      - 3000:3000  # Dashboard app, if created
     env_file: .env
     volumes:
       - .:/cube/conf

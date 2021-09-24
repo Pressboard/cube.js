@@ -3,6 +3,146 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.29](https://github.com/cube-js/cube.js/compare/v0.28.28...v0.28.29) (2021-08-31)
+
+
+### Features
+
+* Mixed rolling window and regular measure queries from rollup support ([#3326](https://github.com/cube-js/cube.js/issues/3326)) ([3147e33](https://github.com/cube-js/cube.js/commit/3147e339f14ede73e5b0d14d05b9dd1f8b79e7b8))
+
+
+
+
+
+## [0.28.24](https://github.com/cube-js/cube.js/compare/v0.28.23...v0.28.24) (2021-08-19)
+
+
+### Features
+
+* Added Quarter to the timeDimensions of ([3f62b2c](https://github.com/cube-js/cube.js/commit/3f62b2c125b2b7b752e370b65be4c89a0c65a623))
+* Support quarter granularity ([4ad1356](https://github.com/cube-js/cube.js/commit/4ad1356ac2d2c4d479c25e60519b0f7b4c1605bb))
+
+
+
+
+
+## [0.28.22](https://github.com/cube-js/cube.js/compare/v0.28.21...v0.28.22) (2021-08-17)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+
+
+
+
+## [0.28.19](https://github.com/cube-js/cube.js/compare/v0.28.18...v0.28.19) (2021-08-13)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+
+
+
+
+## [0.28.17](https://github.com/cube-js/cube.js/compare/v0.28.16...v0.28.17) (2021-08-11)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+
+
+
+
+## [0.28.14](https://github.com/cube-js/cube.js/compare/v0.28.13...v0.28.14) (2021-08-05)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** live preview styles ([#3191](https://github.com/cube-js/cube.js/issues/3191)) ([862ee27](https://github.com/cube-js/cube.js/commit/862ee2761e0e41a2598b16c13d4d8b0e68b8bb29))
+
+
+
+
+
+## [0.28.10](https://github.com/cube-js/cube.js/compare/v0.28.9...v0.28.10) (2021-07-30)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+
+
+
+
+## [0.28.9](https://github.com/cube-js/cube.js/compare/v0.28.8...v0.28.9) (2021-07-29)
+
+
+### Bug Fixes
+
+* Optimize timestamp formatting and table names loading for large partition range serving ([#3166](https://github.com/cube-js/cube.js/issues/3166)) ([e1f8dc5](https://github.com/cube-js/cube.js/commit/e1f8dc5aab469b060f0fe8c69467117171c070fd))
+
+
+
+
+
+## [0.28.6](https://github.com/cube-js/cube.js/compare/v0.28.5...v0.28.6) (2021-07-22)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+
+
+
+
+## [0.28.2](https://github.com/cube-js/cube.js/compare/v0.28.1...v0.28.2) (2021-07-20)
+
+
+### Bug Fixes
+
+* Use experimental flag for pre-aggregations queue events bus, debug API ([#3130](https://github.com/cube-js/cube.js/issues/3130)) ([4f141d7](https://github.com/cube-js/cube.js/commit/4f141d789cd0058b2e7c07af6a16642d6c145834))
+
+
+
+
+
+# [0.28.0](https://github.com/cube-js/cube.js/compare/v0.27.53...v0.28.0) (2021-07-17)
+
+
+### Features
+
+* Move partition range evaluation from Schema Compiler to Query Orchestrator to allow unbounded queries on partitioned pre-aggregations ([8ea654e](https://github.com/cube-js/cube.js/commit/8ea654e93b57014fb2409e070b3a4c381985a9fd))
+
+
+
+
+
+## [0.27.47](https://github.com/cube-js/cube.js/compare/v0.27.46...v0.27.47) (2021-07-06)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** wrong redirect to schema page ([#3064](https://github.com/cube-js/cube.js/issues/3064)) ([2c6f9e8](https://github.com/cube-js/cube.js/commit/2c6f9e878604055e051ea37420379ea0a1cdca13))
+
+
+
+
+
+## [0.27.46](https://github.com/cube-js/cube.js/compare/v0.27.45...v0.27.46) (2021-07-01)
+
+
+### Bug Fixes
+
+* Priorities for REFRESH_WORKER/SCHEDULED_REFRESH/SCHEDULED_REFRESH_TIMER ([176cdfd](https://github.com/cube-js/cube.js/commit/176cdfd00e63d8d7d6715e9079ad01edae1eb84a))
+
+
+
+
+
+## [0.27.45](https://github.com/cube-js/cube.js/compare/v0.27.44...v0.27.45) (2021-06-30)
+
+
+### Features
+
+* Introduce CUBEJS_REFRESH_WORKER and CUBEJS_ROLLUP_ONLY ([68cb358](https://github.com/cube-js/cube.js/commit/68cb358d627d3ffcf5b73fecc687db66e44209db))
+
+
+
+
+
 ## [0.27.37](https://github.com/cube-js/cube.js/compare/v0.27.36...v0.27.37) (2021-06-21)
 
 **Note:** Version bump only for package @cubejs-backend/shared

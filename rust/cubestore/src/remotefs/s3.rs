@@ -4,11 +4,14 @@ use crate::util::lock::acquire_lock;
 use crate::CubeError;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use datafusion::cube_ext;
 use log::{debug, info};
 use regex::{NoExpand, Regex};
 use s3::creds::Credentials;
 use s3::{Bucket, Region};
 use std::env;
+use std::fmt;
+use std::fmt::Formatter;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -17,12 +20,26 @@ use tempfile::NamedTempFile;
 use tokio::fs;
 use tokio::sync::Mutex;
 
-#[derive(Debug)]
 pub struct S3RemoteFs {
     dir: PathBuf,
     bucket: std::sync::RwLock<Bucket>,
     sub_path: Option<String>,
     delete_mut: Mutex<()>,
+}
+
+impl fmt::Debug for S3RemoteFs {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let mut s = f.debug_struct("S3RemoteFs");
+        s.field("dir", &self.dir).field("sub_path", &self.sub_path);
+        // Do not expose AWS credentials.
+        match self.bucket.try_read() {
+            Ok(bucket) => s
+                .field("bucket_name", &bucket.name)
+                .field("bucket_region", &bucket.region),
+            Err(_) => s.field("bucket", &"<locked>"),
+        };
+        s.finish_non_exhaustive()
+    }
 }
 
 impl S3RemoteFs {
@@ -125,7 +142,7 @@ impl RemoteFs for S3RemoteFs {
         let path = self.s3_path(remote_path);
         let bucket = self.bucket.read().unwrap().clone();
         let temp_upload_path_copy = temp_upload_path.to_string();
-        let status_code = tokio::task::spawn_blocking(move || {
+        let status_code = cube_ext::spawn_blocking(move || {
             bucket.put_object_stream_blocking(temp_upload_path_copy, path)
         })
         .await??;
@@ -165,7 +182,7 @@ impl RemoteFs for S3RemoteFs {
             debug!("Downloading {}", remote_path);
             let path = self.s3_path(remote_path);
             let bucket = self.bucket.read().unwrap().clone();
-            let status_code = tokio::task::spawn_blocking(move || -> Result<u16, CubeError> {
+            let status_code = cube_ext::spawn_blocking(move || -> Result<u16, CubeError> {
                 let (mut temp_file, temp_path) =
                     NamedTempFile::new_in(&downloads_dir)?.into_parts();
 
@@ -194,7 +211,7 @@ impl RemoteFs for S3RemoteFs {
         let path = self.s3_path(remote_path);
         let bucket = self.bucket.read().unwrap().clone();
         let (_, status_code) =
-            tokio::task::spawn_blocking(move || bucket.delete_object_blocking(path)).await??;
+            cube_ext::spawn_blocking(move || bucket.delete_object_blocking(path)).await??;
         info!("Deleting {} ({:?})", remote_path, time.elapsed()?);
         if status_code != 204 {
             return Err(CubeError::user(format!(
@@ -226,7 +243,7 @@ impl RemoteFs for S3RemoteFs {
     async fn list_with_metadata(&self, remote_prefix: &str) -> Result<Vec<RemoteFile>, CubeError> {
         let path = self.s3_path(remote_prefix);
         let bucket = self.bucket.read().unwrap().clone();
-        let list = tokio::task::spawn_blocking(move || bucket.list_blocking(path, None)).await??;
+        let list = cube_ext::spawn_blocking(move || bucket.list_blocking(path, None)).await??;
         let leading_slash = Regex::new(format!("^{}", self.s3_path("")).as_str()).unwrap();
         let result = list
             .iter()

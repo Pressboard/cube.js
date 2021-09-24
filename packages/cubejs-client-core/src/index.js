@@ -1,4 +1,4 @@
-import { v4 as uuid } from 'uuid';
+import { v4 as uuidv4 } from 'uuid';
 import ResultSet from './ResultSet';
 import SqlQuery from './SqlQuery';
 import Meta from './Meta';
@@ -10,9 +10,17 @@ let mutexCounter = 0;
 
 const MUTEX_ERROR = 'Mutex has been changed';
 
-const mutexPromise = (promise) => new Promise((resolve, reject) => {
-  promise.then(r => resolve(r), e => e !== MUTEX_ERROR && reject(e));
-});
+function mutexPromise(promise) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      resolve(await promise);
+    } catch (error) {
+      if (error !== MUTEX_ERROR) {
+        reject(error);
+      }
+    }
+  });
+}
 
 class CubejsApi {
   constructor(apiToken, options) {
@@ -40,10 +48,12 @@ class CubejsApi {
     });
     this.pollInterval = options.pollInterval || 5;
     this.parseDateMeasures = options.parseDateMeasures;
+    
+    this.updateAuthorizationPromise = null;
   }
 
   request(method, params) {
-    return this.transport.request(method, { baseRequestId: uuid(), ...params });
+    return this.transport.request(method, { baseRequestId: uuidv4(), ...params });
   }
 
   loadMethod(request, toResult, options, callback) {
@@ -52,7 +62,7 @@ class CubejsApi {
       callback = options;
       options = undefined;
     }
-
+    
     options = options || {};
 
     const mutexKey = options.mutexKey || 'default';
@@ -62,6 +72,7 @@ class CubejsApi {
 
     const requestPromise = this.updateTransportAuthorization().then(() => request());
 
+    let skipAuthorizationUpdate = true;
     let unsubscribed = false;
 
     const checkMutex = async () => {
@@ -100,8 +111,12 @@ class CubejsApi {
         }
         return null;
       };
-
-      await this.updateTransportAuthorization();
+      
+      if (options.subscribe && !skipAuthorizationUpdate) {
+        await this.updateTransportAuthorization();
+      }
+      
+      skipAuthorizationUpdate = false;
 
       if (response.status === 502) {
         await checkMutex();
@@ -109,11 +124,12 @@ class CubejsApi {
       }
 
       let body = {};
-
+      let text = '';
       try {
-        body = await response.clone().json();
+        text = await response.text();
+        body = JSON.parse(text);
       } catch (_) {
-        body.error = await response.text();
+        body.error = text;
       }
 
       if (body.error === 'Continue wait') {
@@ -173,11 +189,27 @@ class CubejsApi {
   }
 
   async updateTransportAuthorization() {
+    if (this.updateAuthorizationPromise) {
+      await this.updateAuthorizationPromise;
+      return;
+    }
+    
     if (typeof this.apiToken === 'function') {
-      const token = await this.apiToken();
-      if (this.transport.authorization !== token) {
-        this.transport.authorization = token;
-      }
+      this.updateAuthorizationPromise = new Promise(async (resolve, reject) => {
+        try {
+          const token = await this.apiToken();
+          if (this.transport.authorization !== token) {
+            this.transport.authorization = token;
+          }
+          resolve();
+        } catch (error) {
+          reject(error);
+        } finally {
+          this.updateAuthorizationPromise = null;
+        }
+      });
+      
+      await this.updateAuthorizationPromise;
     }
   }
 

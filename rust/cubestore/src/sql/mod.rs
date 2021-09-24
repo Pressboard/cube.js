@@ -11,7 +11,6 @@ use chrono::format::Numeric::{Day, Hour, Minute, Month, Second, Year};
 use chrono::format::Pad::Zero;
 use chrono::format::Parsed;
 use chrono::{ParseResult, Utc};
-use datafusion::physical_plan::datetime_expressions::string_to_timestamp_nanos;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::sql::parser::Statement as DFStatement;
 use futures::future::join_all;
@@ -36,7 +35,7 @@ use crate::import::limits::ConcurrencyLimits;
 use crate::import::Ingestion;
 use crate::metastore::job::JobType;
 use crate::metastore::{
-    is_valid_binary_hll_input, table::Table, HllFlavour, IdRow, ImportFormat, Index, IndexDef,
+    is_valid_plain_binary_hll, table::Table, HllFlavour, IdRow, ImportFormat, Index, IndexDef,
     MetaStoreTable, RowKey, Schema, TableId,
 };
 use crate::queryplanner::query_executor::{batch_to_dataframe, QueryExecutor};
@@ -55,6 +54,8 @@ use crate::{
     metastore::{Column, ColumnType, MetaStore},
     store::DataFrame,
 };
+use arrow::compute::kernels::cast_utils::string_to_timestamp_nanos;
+use datafusion::cube_ext;
 use tempfile::TempDir;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
@@ -121,6 +122,7 @@ impl SqlServiceImpl {
         remote_fs: Arc<dyn RemoteFs>,
         rows_per_chunk: usize,
         query_timeout: Duration,
+        max_cached_queries: usize,
     ) -> Arc<SqlServiceImpl> {
         Arc::new(SqlServiceImpl {
             db,
@@ -132,7 +134,7 @@ impl SqlServiceImpl {
             rows_per_chunk,
             query_timeout,
             remote_fs,
-            cache: SqlResultCache::new(10000), // TODO config
+            cache: SqlResultCache::new(max_cached_queries),
         })
     }
 
@@ -614,7 +616,7 @@ impl SqlService for SqlServiceImpl {
                                             .map(|r| r.read())
                                             .collect::<Result<Vec<_>, _>>()?;
                                     }
-                                    Ok(tokio::task::spawn_blocking(
+                                    Ok(cube_ext::spawn_blocking(
                                         move || -> Result<DataFrame, CubeError> {
                                             let df = batch_to_dataframe(&records)?;
                                             Ok(df)
@@ -761,6 +763,7 @@ fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, CubeErr
                         "hyperloglog" => ColumnType::HyperLogLog(HllFlavour::Airlift),
                         "hyperloglogpp" => ColumnType::HyperLogLog(HllFlavour::ZetaSketch),
                         "hll_snowflake" => ColumnType::HyperLogLog(HllFlavour::Snowflake),
+                        "hll_postgres" => ColumnType::HyperLogLog(HllFlavour::Postgres),
                         _ => {
                             return Err(CubeError::user(format!(
                                 "Custom type '{}' is not supported",
@@ -832,10 +835,15 @@ fn parse_hyper_log_log<'a>(
             *buffer = hll.write();
             Ok(buffer)
         }
-        f => {
-            assert!(f.imports_from_binary());
+        HllFlavour::Postgres => {
             let bytes = parse_binary_string(buffer, v)?;
-            is_valid_binary_hll_input(bytes, f)?;
+            let hll = HllSketch::read_hll_storage_spec(bytes)?;
+            *buffer = hll.write();
+            Ok(buffer)
+        }
+        HllFlavour::Airlift | HllFlavour::ZetaSketch => {
+            let bytes = parse_binary_string(buffer, v)?;
+            is_valid_plain_binary_hll(bytes, f)?;
             Ok(bytes)
         }
     }
@@ -1091,6 +1099,7 @@ mod tests {
                 remote_fs.clone(),
                 rows_per_chunk,
                 query_timeout,
+                10_000, // max_cached_queries
             );
             let i = service.exec_query("CREATE SCHEMA foo").await.unwrap();
             assert_eq!(
@@ -1141,6 +1150,7 @@ mod tests {
                 remote_fs.clone(),
                 rows_per_chunk,
                 query_timeout,
+                10_000, // max_cached_queries
             );
             let i = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
             assert_eq!(
@@ -1318,7 +1328,7 @@ mod tests {
                             join_results.push(Row::new(vec![TableValue::String(email.clone()), TableValue::String(uuid), TableValue::Int(i)]))
                         }
                     } else {
-                        join_results.push(Row::new(vec![TableValue::String(email.clone()), TableValue::String("".to_string()), TableValue::Int(i)]))
+                        join_results.push(Row::new(vec![TableValue::String(email.clone()), TableValue::Null, TableValue::Int(i)]))
                     }
                 }
 

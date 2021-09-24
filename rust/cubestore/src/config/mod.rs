@@ -1,3 +1,4 @@
+#![allow(deprecated)] // 'vtable' and 'TraitObject' are deprecated.
 pub mod injection;
 pub mod processing_loop;
 
@@ -5,7 +6,7 @@ use crate::cluster::transport::{
     ClusterTransport, ClusterTransportImpl, MetaStoreTransport, MetaStoreTransportImpl,
 };
 use crate::cluster::{Cluster, ClusterImpl, ClusterMetaStoreClient};
-use crate::config::injection::{get_service, get_service_typed, DIService, Injector, InjectorRef};
+use crate::config::injection::{DIService, Injector};
 use crate::config::processing_loop::ProcessingLoop;
 use crate::http::HttpServer;
 use crate::import::limits::ConcurrencyLimits;
@@ -24,6 +25,7 @@ use crate::store::compaction::{CompactionService, CompactionServiceImpl};
 use crate::store::{ChunkDataStore, ChunkStore, WALDataStore, WALStore};
 use crate::telemetry::{start_track_event_loop, stop_track_event_loop};
 use crate::CubeError;
+use datafusion::cube_ext;
 use futures::future::join_all;
 use log::Level;
 use log::{debug, error};
@@ -59,7 +61,7 @@ pub struct WorkerServices {
 impl CubeServices {
     pub async fn start_processing_loops(&self) -> Result<(), CubeError> {
         let futures = self.spawn_processing_loops().await?;
-        tokio::spawn(async move {
+        cube_ext::spawn(async move {
             if let Err(e) = Self::wait_loops(futures).await {
                 error!("Error in processing loop: {}", e);
             }
@@ -82,22 +84,22 @@ impl CubeServices {
     async fn spawn_processing_loops(&self) -> Result<Vec<LoopHandle>, CubeError> {
         let mut futures = Vec::new();
         let cluster = self.cluster.clone();
-        futures.push(tokio::spawn(async move {
+        futures.push(cube_ext::spawn(async move {
             cluster.wait_processing_loops().await
         }));
         let remote_fs = self.remote_fs.clone();
-        futures.push(tokio::spawn(async move {
+        futures.push(cube_ext::spawn(async move {
             QueueRemoteFs::wait_processing_loops(remote_fs.clone()).await
         }));
         if !self.cluster.is_select_worker() {
             let rocks_meta_store = self.rocks_meta_store.clone().unwrap();
-            futures.push(tokio::spawn(async move {
+            futures.push(cube_ext::spawn(async move {
                 RocksMetaStore::wait_upload_loop(rocks_meta_store).await;
                 Ok(())
             }));
             let cluster = self.cluster.clone();
             let (started_tx, started_rx) = tokio::sync::oneshot::channel();
-            futures.push(tokio::spawn(async move {
+            futures.push(cube_ext::spawn(async move {
                 ClusterImpl::listen_on_metastore_port(cluster, started_tx).await
             }));
             started_rx.await?;
@@ -107,29 +109,31 @@ impl CubeServices {
 
             if self.injector.has_service_typed::<MySqlServer>().await {
                 let mysql_server = self.injector.get_service_typed::<MySqlServer>().await;
-                futures.push(tokio::spawn(
-                    async move { mysql_server.processing_loop().await },
-                ));
+                futures.push(cube_ext::spawn(async move {
+                    mysql_server.processing_loop().await
+                }));
             }
             if self.injector.has_service_typed::<HttpServer>().await {
                 let http_server = self.injector.get_service_typed::<HttpServer>().await;
-                futures.push(tokio::spawn(async move { http_server.run_server().await }));
+                futures.push(cube_ext::spawn(
+                    async move { http_server.run_server().await },
+                ));
             }
         } else {
             let cluster = self.cluster.clone();
             let (started_tx, started_rx) = tokio::sync::oneshot::channel();
-            futures.push(tokio::spawn(async move {
+            futures.push(cube_ext::spawn(async move {
                 ClusterImpl::listen_on_worker_port(cluster, started_tx).await
             }));
             started_rx.await?;
 
             let cluster = self.cluster.clone();
-            futures.push(tokio::spawn(async move {
+            futures.push(cube_ext::spawn(async move {
                 cluster.warmup_select_worker().await;
                 Ok(())
             }))
         }
-        futures.push(tokio::spawn(async move {
+        futures.push(cube_ext::spawn(async move {
             start_track_event_loop().await;
             Ok(())
         }));
@@ -162,6 +166,75 @@ impl CubeServices {
         stop_track_event_loop().await;
         Ok(())
     }
+}
+
+pub struct ValidationMessages {
+    /// Hard errors, config cannot be used. Application must report these and exit.
+    pub errors: Vec<String>,
+    /// Must be reported to the user, but does not stop application from working.
+    pub warnings: Vec<String>,
+}
+
+impl ValidationMessages {
+    pub fn report_and_abort_on_errors(&self) {
+        for w in &self.warnings {
+            log::warn!("{}", w);
+        }
+        for e in &self.errors {
+            log::error!("{}", e);
+        }
+        if !self.errors.is_empty() {
+            log::error!("Cannot proceed with invalid configuration, exiting");
+            std::process::exit(1)
+        }
+    }
+}
+
+/// This method also looks at environment variables and assumes [c] was obtained by calling
+/// `Config::default()`.
+pub fn validate_config(c: &dyn ConfigObj) -> ValidationMessages {
+    let mut warnings = Vec::new();
+    let mut errors = Vec::new();
+    if is_router(c) && c.metastore_remote_address().is_some() {
+        errors.push(
+            "Router node cannot use remote metastore. Try removing CUBESTORE_META_ADDR".to_string(),
+        );
+    }
+    if !is_router(c) && !c.select_workers().contains(c.server_name()) {
+        warnings.push(format!("Current worker '{}' is missing in CUBESTORE_WORKERS. Please check CUBESTORE_SERVER_NAME and CUBESTORE_WORKERS variables", c.server_name()));
+    }
+
+    let mut router_vars = vec![
+        "CUBESTORE_HTTP_BIND_ADDR",
+        "CUBESTORE_HTTP_PORT",
+        "CUBESTORE_BIND_ADDR",
+        "CUBESTORE_PORT",
+        "CUBESTORE_META_PORT",
+    ];
+    router_vars.retain(|v| env::var(v).is_ok());
+    if !is_router(c) && !router_vars.is_empty() {
+        warnings.push(format!(
+            "The following router variable{} ignored on worker node: {}",
+            if 1 < router_vars.len() { "s" } else { "" },
+            router_vars.join(", ")
+        ));
+    }
+
+    let mut remote_vars = vec![
+        "CUBESTORE_S3_BUCKET",
+        "CUBESTORE_GCS_BUCKET",
+        "CUBESTORE_REMOTE_DIR",
+    ];
+    remote_vars.retain(|v| env::var(v).is_ok());
+    if 1 < remote_vars.len() {
+        warnings.push(format!(
+            "{} variables specified together. Using {}",
+            remote_vars.join(" and "),
+            remote_vars[0],
+        ));
+    }
+
+    ValidationMessages { errors, warnings }
 }
 
 #[derive(Debug, Clone)]
@@ -203,6 +276,8 @@ pub trait ConfigObj: DIService {
 
     fn bind_address(&self) -> &Option<String>;
 
+    fn status_bind_address(&self) -> &Option<String>;
+
     fn http_bind_address(&self) -> &Option<String>;
 
     fn query_timeout(&self) -> u64;
@@ -236,6 +311,8 @@ pub trait ConfigObj: DIService {
     fn enable_startup_warmup(&self) -> bool;
 
     fn malloc_trim_every_secs(&self) -> u64;
+
+    fn max_cached_queries(&self) -> usize;
 }
 
 #[derive(Debug, Clone)]
@@ -249,6 +326,7 @@ pub struct ConfigObjImpl {
     pub select_worker_pool_size: usize,
     pub job_runners_count: usize,
     pub bind_address: Option<String>,
+    pub status_bind_address: Option<String>,
     pub http_bind_address: Option<String>,
     pub query_timeout: u64,
     /// Must be set to 2*query_timeout in prod, only for overrides in tests.
@@ -266,6 +344,7 @@ pub struct ConfigObjImpl {
     pub enable_topk: bool,
     pub enable_startup_warmup: bool,
     pub malloc_trim_every_secs: u64,
+    pub max_cached_queries: usize,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -298,6 +377,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn bind_address(&self) -> &Option<String> {
         &self.bind_address
+    }
+
+    fn status_bind_address(&self) -> &Option<String> {
+        &self.status_bind_address
     }
 
     fn http_bind_address(&self) -> &Option<String> {
@@ -366,6 +449,9 @@ impl ConfigObj for ConfigObjImpl {
     fn malloc_trim_every_secs(&self) -> u64 {
         self.malloc_trim_every_secs
     }
+    fn max_cached_queries(&self) -> usize {
+        self.max_cached_queries
+    }
 }
 
 lazy_static! {
@@ -394,21 +480,23 @@ where
     T: FromStr,
     T::Err: Display,
 {
-    env::var(name)
-        .ok()
-        .map(|x| match x.parse::<T>() {
-            Ok(v) => v,
-            Err(e) => panic!("could not parse value for '{}': {}", name, e),
-        })
-        .unwrap_or(default)
+    env_optparse(name).unwrap_or(default)
+}
+
+fn env_optparse<T>(name: &str) -> Option<T>
+where
+    T: FromStr,
+    T::Err: Display,
+{
+    env::var(name).ok().map(|x| match x.parse::<T>() {
+        Ok(v) => v,
+        Err(e) => panic!("could not parse environment variable '{}': {}", name, e),
+    })
 }
 
 impl Config {
     pub fn default() -> Config {
-        let query_timeout = env::var("CUBESTORE_QUERY_TIMEOUT")
-            .ok()
-            .map(|v| v.parse::<u64>().unwrap())
-            .unwrap_or(120);
+        let query_timeout = env_parse("CUBESTORE_QUERY_TIMEOUT", 120);
         Config {
             injector: Injector::new(),
             config_obj: Arc::new(ConfigObjImpl {
@@ -423,7 +511,9 @@ impl Config {
                     if let Ok(bucket_name) = env::var("CUBESTORE_S3_BUCKET") {
                         FileStoreProvider::S3 {
                             bucket_name,
-                            region: env::var("CUBESTORE_S3_REGION").unwrap(),
+                            region: env::var("CUBESTORE_S3_REGION").expect(
+                                "CUBESTORE_S3_REGION required when CUBESTORE_S3_BUCKET is set",
+                            ),
                             sub_path: env::var("CUBESTORE_S3_SUB_PATH").ok(),
                         }
                     } else if let Ok(bucket_name) = env::var("CUBESTORE_GCS_BUCKET") {
@@ -439,21 +529,17 @@ impl Config {
                         FileStoreProvider::Filesystem { remote_dir: None }
                     }
                 },
-                select_worker_pool_size: env::var("CUBESTORE_SELECT_WORKERS")
-                    .ok()
-                    .map(|v| v.parse::<usize>().unwrap())
-                    .unwrap_or(4),
-                bind_address: Some(env::var("CUBESTORE_BIND_ADDR").ok().unwrap_or(
-                    format!("0.0.0.0:{}", env::var("CUBESTORE_PORT")
-                            .ok()
-                            .map(|v| v.parse::<u16>().unwrap())
-                            .unwrap_or(3306u16)),
+                select_worker_pool_size: env_parse("CUBESTORE_SELECT_WORKERS", 4),
+                bind_address: Some(
+                    env::var("CUBESTORE_BIND_ADDR")
+                        .ok()
+                        .unwrap_or(format!("0.0.0.0:{}", env_parse("CUBESTORE_PORT", 3306))),
+                ),
+                status_bind_address: Some(env::var("CUBESTORE_STATUS_BIND_ADDR").ok().unwrap_or(
+                    format!("0.0.0.0:{}", env_parse("CUBESTORE_STATUS_PORT", 3031)),
                 )),
                 http_bind_address: Some(env::var("CUBESTORE_HTTP_BIND_ADDR").ok().unwrap_or(
-                    format!("0.0.0.0:{}", env::var("CUBESTORE_HTTP_PORT")
-                        .ok()
-                        .map(|v| v.parse::<u16>().unwrap())
-                        .unwrap_or(3030u16)),
+                    format!("0.0.0.0:{}", env_parse("CUBESTORE_HTTP_PORT", 3030)),
                 )),
                 query_timeout,
                 not_used_timeout: 2 * query_timeout,
@@ -461,27 +547,16 @@ impl Config {
                     .ok()
                     .map(|v| v.split(",").map(|s| s.to_string()).collect())
                     .unwrap_or(Vec::new()),
-                worker_bind_address: env::var("CUBESTORE_WORKER_PORT")
-                    .ok()
+                worker_bind_address: env_optparse::<u16>("CUBESTORE_WORKER_PORT")
                     .map(|v| format!("0.0.0.0:{}", v)),
-                metastore_bind_address: env::var("CUBESTORE_META_PORT")
-                    .ok()
+                metastore_bind_address: env_optparse::<u16>("CUBESTORE_META_PORT")
                     .map(|v| format!("0.0.0.0:{}", v)),
                 metastore_remote_address: env::var("CUBESTORE_META_ADDR").ok(),
-                upload_concurrency: 4,
-                download_concurrency: 8,
-                max_ingestion_data_frames: env::var("CUBESTORE_MAX_DATA_FRAMES")
-                    .ok()
-                    .map(|v| v.parse::<usize>().unwrap())
-                    .unwrap_or(4),
-                wal_split_threshold: env::var("CUBESTORE_WAL_SPLIT_THRESHOLD")
-                    .ok()
-                    .map(|v| v.parse::<u64>().unwrap())
-                    .unwrap_or(524288 / 2),
-                job_runners_count: env::var("CUBESTORE_JOB_RUNNERS")
-                    .ok()
-                    .map(|v| v.parse::<usize>().unwrap())
-                    .unwrap_or(4),
+                upload_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_UPLOADS", 4),
+                download_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_DOWNLOADS", 8),
+                max_ingestion_data_frames: env_parse("CUBESTORE_MAX_DATA_FRAMES", 4),
+                wal_split_threshold: env_parse("CUBESTORE_WAL_SPLIT_THRESHOLD", 524288 / 2),
+                job_runners_count: env_parse("CUBESTORE_JOB_RUNNERS", 4),
                 connection_timeout: 60,
                 server_name: env::var("CUBESTORE_SERVER_NAME")
                     .ok()
@@ -489,7 +564,8 @@ impl Config {
                 upload_to_remote: !env::var("CUBESTORE_NO_UPLOAD").ok().is_some(),
                 enable_topk: env_bool("CUBESTORE_ENABLE_TOPK", true),
                 enable_startup_warmup: env_bool("CUBESTORE_STARTUP_WARMUP", true),
-                malloc_trim_every_secs: env_parse::<u64>("CUBESTORE_MALLOC_TRIM_EVERY_SECS", 30),
+                malloc_trim_every_secs: env_parse("CUBESTORE_MALLOC_TRIM_EVERY_SECS", 30),
+                max_cached_queries: env_parse("CUBESTORE_MAX_CACHED_QUERIES", 10_000),
             }),
         }
     }
@@ -515,6 +591,7 @@ impl Config {
                 select_worker_pool_size: 0,
                 job_runners_count: 4,
                 bind_address: None,
+                status_bind_address: None,
                 http_bind_address: None,
                 query_timeout,
                 not_used_timeout: 2 * query_timeout,
@@ -532,6 +609,7 @@ impl Config {
                 enable_topk: true,
                 enable_startup_warmup: true,
                 malloc_trim_every_secs: 0,
+                max_cached_queries: 10_000,
             }),
         }
     }
@@ -729,11 +807,7 @@ impl Config {
                 .await;
         }
 
-        if self
-            .injector
-            .has_service_typed::<dyn MetaStoreTransport>()
-            .await
-        {
+        if uses_remote_metastore(&self.injector).await {
             self.injector
                 .register_typed::<dyn MetaStore, _, _, _>(async move |i| {
                     let transport = ClusterMetaStoreClient::new(i.get_service_typed().await);
@@ -748,8 +822,8 @@ impl Config {
                         let meta_store = RocksMetaStore::load_from_remote(
                             &path,
                             // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
-                            get_service(&i, "original_remote_fs").await,
-                            get_service_typed::<dyn ConfigObj>(&i).await,
+                            i.get_service("original_remote_fs").await,
+                            i.get_service_typed::<dyn ConfigObj>().await,
                         )
                         .await
                         .unwrap();
@@ -856,6 +930,7 @@ impl Config {
 
         self.injector
             .register_typed::<dyn SqlService, _, _, _>(async move |i| {
+                let c = i.get_service_typed::<dyn ConfigObj>().await;
                 SqlServiceImpl::new(
                     i.get_service_typed().await,
                     i.get_service_typed().await,
@@ -864,12 +939,9 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
-                    i.get_service_typed::<dyn ConfigObj>()
-                        .await
-                        .wal_split_threshold() as usize,
-                    Duration::from_secs(
-                        i.get_service_typed::<dyn ConfigObj>().await.query_timeout(),
-                    ),
+                    c.wal_split_threshold() as usize,
+                    Duration::from_secs(c.query_timeout()),
+                    c.max_cached_queries(),
                 )
             })
             .await;
@@ -959,3 +1031,11 @@ impl Config {
 }
 
 type LoopHandle = JoinHandle<Result<(), CubeError>>;
+
+pub async fn uses_remote_metastore(i: &Injector) -> bool {
+    i.has_service_typed::<dyn MetaStoreTransport>().await
+}
+
+pub fn is_router(c: &dyn ConfigObj) -> bool {
+    !c.worker_bind_address().is_some()
+}

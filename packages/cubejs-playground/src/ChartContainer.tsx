@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import { Component, useEffect } from 'react';
 import {
   CodeOutlined,
   CodeSandboxOutlined,
@@ -7,14 +7,13 @@ import {
   PlusOutlined,
   QuestionCircleOutlined,
   SyncOutlined,
-  ThunderboltOutlined,
 } from '@ant-design/icons';
 import { Dropdown, Menu, Modal } from 'antd';
 import { getParameters } from 'codesandbox-import-utils/lib/api/define';
 import styled from 'styled-components';
 import { Redirect, RouteComponentProps, withRouter } from 'react-router-dom';
 import { QueryRenderer } from '@cubejs-client/react';
-import { Query, ResultSet } from '@cubejs-client/core';
+import { ChartType, Query, ResultSet } from '@cubejs-client/core';
 import { format } from 'sql-formatter';
 
 import { SectionRow } from './components';
@@ -80,18 +79,27 @@ export const frameworks: FrameworkDescriptor[] = [
   },
 ];
 
-type TChartContainerProps = {
+type ChartContainerProps = {
   query: Query;
   hideActions: boolean;
+  chartType: ChartType;
   dashboardSource?: DashboardSource;
   error?: Error;
   resultSet?: ResultSet;
   [k: string]: any;
 };
 
+type ChartContainerState = {
+  sql: {
+    loading: boolean;
+    value?: string;
+  };
+  [k: string]: any;
+};
+
 class ChartContainer extends Component<
-  TChartContainerProps & RouteComponentProps,
-  any
+  ChartContainerProps & RouteComponentProps,
+  ChartContainerState
 > {
   static defaultProps = {
     query: {},
@@ -104,7 +112,8 @@ class ChartContainer extends Component<
       props.iframeRef.current != null &&
       props.chartingLibrary
     ) {
-      const { __cubejsPlayground } = props.iframeRef.current.contentWindow;
+      const { __cubejsPlayground } =
+        props.iframeRef.current.contentWindow || {};
 
       if (!__cubejsPlayground) {
         return {
@@ -152,7 +161,10 @@ class ChartContainer extends Component<
     this.state = {
       showCode: false,
       chartRendererError: null,
-    } as any;
+      sql: {
+        loading: false,
+      },
+    };
   }
 
   render() {
@@ -164,6 +176,7 @@ class ChartContainer extends Component<
       showCode,
       addingToDashboard,
       chartRendererError,
+      sql,
     } = this.state;
     const {
       isChartRendererReady,
@@ -290,7 +303,6 @@ class ChartContainer extends Component<
 
             <Button
               data-testid="json-query-btn"
-              icon={<ThunderboltOutlined />}
               size="small"
               type={showCode === 'query' ? 'primary' : 'default'}
               disabled={!frameworkItem?.supported || isFetchingMeta}
@@ -366,6 +378,7 @@ class ChartContainer extends Component<
               onClick={async () => {
                 this.setState({ addingToDashboard: true });
                 const canAddChart = await dashboardSource.canAddChart();
+
                 if (typeof canAddChart === 'boolean' && canAddChart) {
                   playgroundAction('Add to Dashboard');
                   await dashboardSource.addChart(codeExample);
@@ -435,7 +448,7 @@ class ChartContainer extends Component<
         );
       } else if (showCode === 'code') {
         if (error) {
-          return <FatalError error={error} />
+          return <FatalError error={error} />;
         }
 
         return <PrismCode code={codeExample} />;
@@ -446,14 +459,32 @@ class ChartContainer extends Component<
           <QueryRenderer
             loadSql="only"
             query={query}
-            render={({ sqlQuery, error }) => {
+            render={({ sqlQuery, loadingState, error }) => {
               if (error) {
-                return <FatalError error={error} />
+                return <FatalError error={error} />;
               }
 
-              const [query] = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery];
               // in the case of a compareDateRange query the SQL will be the same
-              return <PrismCode code={query && format(query.sql())} />;
+              const [query] = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery];
+              const value = query && format(query.sql());
+
+              return (
+                <>
+                  <PrismCode code={value} />
+                  <SqlEmitter
+                    loading={loadingState.isLoading}
+                    sql={value}
+                    onChange={({ sql, loading }) => {
+                      this.setState({
+                        sql: {
+                          loading,
+                          value: sql,
+                        },
+                      });
+                    }}
+                  />
+                </>
+              );
             }}
           />
         );
@@ -469,6 +500,7 @@ class ChartContainer extends Component<
       title = (
         <SectionRow style={{ alignItems: 'center' }}>
           <div>Code</div>
+
           <Button
             data-testid="copy-code-btn"
             icon={<CopyOutlined />}
@@ -488,6 +520,7 @@ class ChartContainer extends Component<
       title = (
         <SectionRow>
           <div>Query</div>
+
           <Button
             data-testid="copy-cube-query-btn"
             icon={<CopyOutlined />}
@@ -503,7 +536,26 @@ class ChartContainer extends Component<
         </SectionRow>
       );
     } else if (showCode === 'sql') {
-      title = 'SQL';
+      title = (
+        <SectionRow>
+          <div>SQL</div>
+
+          {!sql.loading && sql.value ? (
+            <Button
+              data-testid="copy-sql-btn"
+              icon={<CopyOutlined />}
+              size="small"
+              onClick={async () => {
+                await copyToClipboard(sql.value, 'The SQL has been copied');
+                playgroundAction('Copy SQL to Clipboard');
+              }}
+              type="primary"
+            >
+              Copy to Clipboard
+            </Button>
+          ) : null}
+        </SectionRow>
+      );
     } else if (showCode === 'cache') {
       title = 'Cache';
     } else {
@@ -518,6 +570,25 @@ class ChartContainer extends Component<
       </StyledCard>
     );
   }
+}
+
+type SqlEmitterOnChangeProps = {
+  sql?: string;
+  loading: boolean;
+};
+
+type SqlEmitterProps = {
+  loading: boolean;
+  sql?: string;
+  onChange: (props: SqlEmitterOnChangeProps) => void;
+};
+
+function SqlEmitter({ sql, loading, onChange }: SqlEmitterProps) {
+  useEffect(() => {
+    onChange({ sql, loading });
+  }, [sql, loading]);
+
+  return null;
 }
 
 export default withRouter(ChartContainer);

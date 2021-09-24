@@ -6,7 +6,7 @@ import {
   UserBackgroundContext,
   QueryRewriteFn,
 } from '@cubejs-backend/api-gateway';
-import { BaseDriver, RedisPoolOptions } from '@cubejs-backend/query-orchestrator';
+import { BaseDriver, RedisPoolOptions, CacheAndQueryDriverType } from '@cubejs-backend/query-orchestrator';
 import { BaseQuery } from '@cubejs-backend/schema-compiler';
 import type { SchemaFileRepository } from './FileRepository';
 
@@ -76,6 +76,7 @@ export type DatabaseType =
   | 'sqlite';
 
 export type ContextToAppIdFn = (context: RequestContext) => string;
+export type ContextToOrchestratorIdFn = (context: RequestContext) => string;
 
 export type OrchestratorOptionsFn = (context: RequestContext) => OrchestratorOptions;
 
@@ -83,12 +84,12 @@ export type PreAggregationsSchemaFn = (context: RequestContext) => string;
 
 // internal
 export type DbTypeFn = (context: DriverContext) => DatabaseType;
-export type DriverFactoryFn = (context: DriverContext) => Promise<BaseDriver>|BaseDriver;
+export type DriverFactoryFn = (context: DriverContext) => Promise<BaseDriver> | BaseDriver;
 export type DialectFactoryFn = (context: DialectContext) => BaseQuery;
 
 // external
 export type ExternalDbTypeFn = (context: RequestContext) => DatabaseType;
-export type ExternalDriverFactoryFn = (context: RequestContext) => Promise<BaseDriver>|BaseDriver;
+export type ExternalDriverFactoryFn = (context: RequestContext) => Promise<BaseDriver> | BaseDriver;
 export type ExternalDialectFactoryFn = (context: RequestContext) => BaseQuery;
 
 export type LoggerFn = (msg: string, params: Record<string, any>) => void;
@@ -105,9 +106,9 @@ export interface CreateOptions {
   dialectFactory?: DialectFactoryFn;
   externalDriverFactory?: ExternalDriverFactoryFn;
   externalDialectFactory?: ExternalDialectFactoryFn;
-  cacheAndQueueDriver?: 'redis' | 'memory';
+  cacheAndQueueDriver?: CacheAndQueryDriverType;
   contextToAppId?: ContextToAppIdFn;
-  contextToOrchestratorId?: (context: RequestContext) => string;
+  contextToOrchestratorId?: ContextToOrchestratorIdFn;
   repositoryFactory?: (context: RequestContext) => SchemaFileRepository;
   checkAuthMiddleware?: CheckAuthMiddlewareFn;
   checkAuth?: CheckAuthFn;
@@ -116,7 +117,7 @@ export interface CreateOptions {
   queryTransformer?: QueryRewriteFn;
   queryRewrite?: QueryRewriteFn;
   preAggregationsSchema?: string | PreAggregationsSchemaFn;
-  schemaVersion?: (context: RequestContext) => string;
+  schemaVersion?: (context: RequestContext) => string | Promise<string>;
   extendContext?: ExtendContextFn;
   scheduledRefreshTimer?: boolean | number;
   scheduledRefreshTimeZones?: string[];

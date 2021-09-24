@@ -2,11 +2,10 @@
 import { Component, useEffect } from 'react';
 import '@ant-design/compatible/assets/index.css';
 import { Layout, Alert } from 'antd';
-import { fetch } from 'whatwg-fetch';
 import { RouteComponentProps, withRouter } from 'react-router';
 import styled from 'styled-components';
 
-import Header from './components/Header';
+import Header from './components/Header/Header';
 import GlobalStyles from './components/GlobalStyles';
 import { CubeLoader } from './atoms';
 import {
@@ -16,12 +15,9 @@ import {
   setTelemetry,
   trackImpl,
 } from './events';
-import {
-  AppContextConsumer,
-  PlaygroundContext,
-  useAppContext,
-} from './components/AppContext';
-import './index.less';
+import { AppContextConsumer, PlaygroundContext } from './components/AppContext';
+import { useAppContext } from './hooks';
+import { LivePreviewContextProvider } from './components/LivePreviewContext/LivePreviewContextProvider';
 
 const selectedTab = (pathname) => {
   if (pathname === '/template-gallery') {
@@ -55,8 +51,6 @@ class App extends Component<RouteComponentProps, AppState> {
   };
 
   async componentDidMount() {
-    const { history } = this.props;
-
     setTimeout(() => this.setState({ showLoader: true }), 700);
 
     window.addEventListener('unhandledrejection', (promiseRejectionEvent) => {
@@ -80,11 +74,7 @@ class App extends Component<RouteComponentProps, AppState> {
       dockerVersion: context.dockerVersion,
     });
 
-    this.setState({ context }, () => {
-      if (context.shouldStartConnectionWizardFlow) {
-        history.push('/connection');
-      }
-    });
+    this.setState({ context });
   }
 
   componentDidCatch(error, info) {
@@ -101,8 +91,6 @@ class App extends Component<RouteComponentProps, AppState> {
     if (context != null && !isAppContextSet) {
       return (
         <>
-          {showLoader ? <CubeLoader /> : null}
-
           <ContextSetter context={context} />
           <AppContextConsumer
             onReady={() => this.setState({ isAppContextSet: true })}
@@ -111,28 +99,36 @@ class App extends Component<RouteComponentProps, AppState> {
       );
     }
 
+    if (context == null && !isAppContextSet) {
+      return showLoader ? <CubeLoader /> : null;
+    }
+
     if (fatalError) {
       console.log(fatalError.stack);
     }
 
     return (
-      <Layout>
-        <GlobalStyles />
+      <LivePreviewContextProvider
+        disabled={context!.livePreview == null || !context!.livePreview}
+      >
+        <Layout>
+          <GlobalStyles />
 
-        <Header selectedKeys={selectedTab(location.pathname)} />
+          <Header selectedKeys={selectedTab(location.pathname)} />
 
-        <StyledLayoutContent>
-          {fatalError ? (
-            <Alert
-              message="Error occured while rendering"
-              description={fatalError.stack || ''}
-              type="error"
-            />
-          ) : (
-            children
-          )}
-        </StyledLayoutContent>
-      </Layout>
+          <StyledLayoutContent>
+            {fatalError ? (
+              <Alert
+                message="Error occured while rendering"
+                description={fatalError.stack || ''}
+                type="error"
+              />
+            ) : (
+              children
+            )}
+          </StyledLayoutContent>
+        </Layout>
+      </LivePreviewContextProvider>
     );
   }
 }
@@ -147,7 +143,11 @@ function ContextSetter({ context }: ContextSetterProps) {
   useEffect(() => {
     if (context !== null) {
       setContext({
-        playgroundContext: context,
+        ready: true,
+        playgroundContext: {
+          ...context,
+          isCloud: false,
+        },
         identifier: context.identifier,
       });
     }

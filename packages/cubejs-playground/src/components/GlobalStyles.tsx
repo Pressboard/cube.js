@@ -1,6 +1,6 @@
 import { createGlobalStyle } from 'styled-components';
 
-import { CSS_PROPERTIES } from '../variables-esm';
+import { CSS_PROPERTIES } from '../variables';
 
 const GlobalStyles = createGlobalStyle`
   body {
@@ -104,10 +104,6 @@ const GlobalStyles = createGlobalStyle`
   code {
     font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
     monospace;
-  }
-
-  #playground-root {
-    height: 100%;
   }
 
   .schema-sidebar,
@@ -256,6 +252,18 @@ const GlobalStyles = createGlobalStyle`
   
   a.ant-typography {
     text-decoration: underline;
+  }
+  
+  .ant-notification {
+    z-index: 9999;
+  }
+  
+  .ant-modal-header {
+    padding: 16px 24px;
+  }
+  
+  .ant-modal-body {
+    padding: 24px;
   }
 `;
 

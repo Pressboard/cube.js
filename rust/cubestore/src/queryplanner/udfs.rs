@@ -1,8 +1,10 @@
 use crate::queryplanner::coalesce::{coalesce, SUPPORTED_COALESCE_TYPES};
 use crate::queryplanner::hll::Hll;
 use crate::CubeError;
-use arrow::array::{Array, BinaryArray, UInt64Builder};
-use arrow::datatypes::{DataType, TimeUnit};
+use arrow::array::{Array, BinaryArray, TimestampNanosecondArray, UInt64Builder};
+use arrow::datatypes::{DataType, IntervalUnit, TimeUnit};
+use chrono::{TimeZone, Utc};
+use datafusion::cube_ext::datetime::{date_addsub_array, date_addsub_scalar};
 use datafusion::error::DataFusionError;
 use datafusion::physical_plan::functions::Signature;
 use datafusion::physical_plan::udaf::AggregateUDF;
@@ -20,6 +22,8 @@ pub enum CubeScalarUDFKind {
     Coalesce,
     Now,
     UnixTimestamp,
+    DateAdd,
+    DateSub,
 }
 
 pub trait CubeScalarUDF {
@@ -34,6 +38,8 @@ pub fn scalar_udf_by_kind(k: CubeScalarUDFKind) -> Box<dyn CubeScalarUDF> {
         CubeScalarUDFKind::Coalesce => Box::new(Coalesce {}),
         CubeScalarUDFKind::Now => Box::new(Now {}),
         CubeScalarUDFKind::UnixTimestamp => Box::new(UnixTimestamp {}),
+        CubeScalarUDFKind::DateAdd => Box::new(DateAddSub { is_add: true }),
+        CubeScalarUDFKind::DateSub => Box::new(DateAddSub { is_add: false }),
     }
 }
 
@@ -50,6 +56,12 @@ pub fn scalar_kind_by_name(n: &str) -> Option<CubeScalarUDFKind> {
     }
     if n == "UNIX_TIMESTAMP" {
         return Some(CubeScalarUDFKind::UnixTimestamp);
+    }
+    if n == "DATE_ADD" {
+        return Some(CubeScalarUDFKind::DateAdd);
+    }
+    if n == "DATE_SUB" {
+        return Some(CubeScalarUDFKind::DateSub);
     }
     return None;
 }
@@ -175,6 +187,99 @@ impl CubeScalarUDF for UnixTimestamp {
                 Err(DataFusionError::Internal(
                     "UNIX_TIMESTAMP() was not optimized away".to_string(),
                 ))
+            }),
+        };
+    }
+}
+
+struct DateAddSub {
+    is_add: bool,
+}
+
+impl DateAddSub {
+    fn signature() -> Signature {
+        Signature::OneOf(vec![
+            Signature::Exact(vec![
+                DataType::Timestamp(TimeUnit::Nanosecond, None),
+                DataType::Interval(IntervalUnit::YearMonth),
+            ]),
+            Signature::Exact(vec![
+                DataType::Timestamp(TimeUnit::Nanosecond, None),
+                DataType::Interval(IntervalUnit::DayTime),
+            ]),
+        ])
+    }
+}
+
+impl DateAddSub {
+    fn name_static(&self) -> &'static str {
+        match self.is_add {
+            true => "DATE_ADD",
+            false => "DATE_SUB",
+        }
+    }
+}
+
+impl CubeScalarUDF for DateAddSub {
+    fn kind(&self) -> CubeScalarUDFKind {
+        match self.is_add {
+            true => CubeScalarUDFKind::DateAdd,
+            false => CubeScalarUDFKind::DateSub,
+        }
+    }
+
+    fn name(&self) -> &str {
+        self.name_static()
+    }
+
+    fn descriptor(&self) -> ScalarUDF {
+        let name = self.name_static();
+        let is_add = self.is_add;
+        return ScalarUDF {
+            name: self.name().to_string(),
+            signature: Self::signature(),
+            return_type: Arc::new(|_| {
+                Ok(Arc::new(DataType::Timestamp(TimeUnit::Nanosecond, None)))
+            }),
+            fun: Arc::new(move |inputs| {
+                assert_eq!(inputs.len(), 2);
+                let interval = match &inputs[1] {
+                    ColumnarValue::Scalar(i) => i.clone(),
+                    _ => {
+                        // We leave this case out for simplicity.
+                        // CubeStore does not allow intervals inside tables, so this is super rare.
+                        return Err(DataFusionError::Execution(format!(
+                            "Only scalar intervals are supported in `{}`",
+                            name
+                        )));
+                    }
+                };
+                match &inputs[0] {
+                    ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(None)) => Ok(
+                        ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(None)),
+                    ),
+                    ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(Some(t))) => {
+                        let r = date_addsub_scalar(Utc.timestamp_nanos(*t), interval, is_add)?;
+                        Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
+                            Some(r.timestamp_nanos()),
+                        )))
+                    }
+                    ColumnarValue::Array(t) if t.as_any().is::<TimestampNanosecondArray>() => {
+                        let t = t
+                            .as_any()
+                            .downcast_ref::<TimestampNanosecondArray>()
+                            .unwrap();
+                        Ok(ColumnarValue::Array(Arc::new(date_addsub_array(
+                            &t, interval, is_add,
+                        )?)))
+                    }
+                    _ => {
+                        return Err(DataFusionError::Execution(format!(
+                            "First argument of `{}` must be a non-null timestamp",
+                            name
+                        )))
+                    }
+                }
             }),
         };
     }

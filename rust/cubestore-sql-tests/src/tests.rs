@@ -1,3 +1,4 @@
+use crate::rows::{rows, NULL};
 use crate::SqlClient;
 use async_compression::tokio::write::GzipEncoder;
 use cubestore::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, PPOptions};
@@ -31,6 +32,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("custom_types", custom_types),
         t("group_by_boolean", group_by_boolean),
         t("group_by_decimal", group_by_decimal),
+        t("group_by_nulls", group_by_nulls),
         t("float_decimal_scale", float_decimal_scale),
         t("float_merge", float_merge),
         t("join", join),
@@ -42,14 +44,23 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("three_tables_join_with_union", three_tables_join_with_union),
         t("in_list", in_list),
         t("numeric_cast", numeric_cast),
+        t("numbers_to_bool", numbers_to_bool),
         t("union", union),
         t("timestamp_select", timestamp_select),
+        t("timestamp_seconds_frac", timestamp_seconds_frac),
         t("column_escaping", column_escaping),
         t("information_schema", information_schema),
         t("case_column_escaping", case_column_escaping),
         t("inner_column_escaping", inner_column_escaping),
         t("convert_tz", convert_tz),
         t("coalesce", coalesce),
+        t("ilike", ilike),
+        t("count_distinct_crash", count_distinct_crash),
+        t(
+            "count_distinct_group_by_crash",
+            count_distinct_group_by_crash,
+        ),
+        t("count_distinct_take_crash", count_distinct_take_crash),
         t("create_schema_if_not_exists", create_schema_if_not_exists),
         t(
             "create_index_before_ingestion",
@@ -68,6 +79,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("hyperloglog_empty_group_by", hyperloglog_empty_group_by),
         t("hyperloglog_inserts", hyperloglog_inserts),
         t("hyperloglog_inplace_group_by", hyperloglog_inplace_group_by),
+        t("hyperloglog_postgres", hyperloglog_postgres),
         t("hyperloglog_snowflake", hyperloglog_snowflake),
         t("planning_inplace_aggregate", planning_inplace_aggregate),
         t("planning_hints", planning_hints),
@@ -81,10 +93,32 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("offset", offset),
         t("having", having),
         t("rolling_window_join", rolling_window_join),
+        t("rolling_window_query", rolling_window_query),
+        t("rolling_window_exprs", rolling_window_exprs),
+        t(
+            "rolling_window_query_timestamps",
+            rolling_window_query_timestamps,
+        ),
+        t(
+            "rolling_window_extra_aggregate",
+            rolling_window_extra_aggregate,
+        ),
+        t(
+            "rolling_window_extra_aggregate_timestamps",
+            rolling_window_extra_aggregate_timestamps,
+        ),
+        t(
+            "rolling_window_one_week_interval",
+            rolling_window_one_week_interval,
+        ),
+        t("rolling_window_offsets", rolling_window_offsets),
         t("decimal_index", decimal_index),
         t("float_index", float_index),
+        t("date_add", date_add),
         t("now", now),
         t("dump", dump),
+        t("unsorted_merge_assertion", unsorted_merge_assertion),
+        t("unsorted_data_timestamps", unsorted_data_timestamps),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -306,6 +340,31 @@ async fn group_by_decimal(service: Box<dyn SqlClient>) {
     );
 }
 
+async fn group_by_nulls(service: Box<dyn SqlClient>) {
+    let _ = service.exec_query("CREATE SCHEMA s").await.unwrap();
+
+    let _ = service
+        .exec_query("CREATE TABLE s.data (id int, n int)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "INSERT INTO s.data (id, n) VALUES (NULL, 1), (NULL, 2), (NULL, 3), (1, 1), (2, 2)",
+        )
+        .await
+        .unwrap();
+
+    let result = service
+        .exec_query("SELECT id, sum(n) from s.data group by 1 order by 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&result),
+        rows(&[(None, 6), (Some(1), 1), (Some(2), 2)])
+    );
+}
+
 async fn float_decimal_scale(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA foo").await.unwrap();
     service
@@ -392,19 +451,37 @@ async fn join(service: Box<dyn SqlClient>) {
     let result = service.exec_query("SELECT c.city, sum(o.amount) from foo.orders o JOIN foo.customers c ON o.customer_id = c.id GROUP BY 1 ORDER BY 2 DESC").await.unwrap();
 
     assert_eq!(
-        result.get_rows()[0],
-        Row::new(vec![
-            TableValue::String("San Francisco".to_string()),
-            TableValue::Int(10)
-        ])
+        to_rows(&result),
+        vec![
+            vec![
+                TableValue::String("San Francisco".to_string()),
+                TableValue::Int(10)
+            ],
+            vec![
+                TableValue::String("New York".to_string()),
+                TableValue::Int(5)
+            ]
+        ]
     );
-    assert_eq!(
-        result.get_rows()[1],
-        Row::new(vec![
-            TableValue::String("New York".to_string()),
-            TableValue::Int(5)
-        ])
-    );
+
+    // Same query, reverse comparison order.
+    let result2 = service.exec_query("SELECT c.city, sum(o.amount) from foo.orders o JOIN foo.customers c ON c.id = o.customer_id GROUP BY 1 ORDER BY 2 DESC").await.unwrap();
+    assert_eq!(result.get_rows(), result2.get_rows());
+
+    // Join on non-existing field.
+    assert!(service.exec_query("SELECT c.id, sum(o.amount) FROM foo.customers c JOIN foo.orders o ON c.id = o.not_found")
+        .await.is_err());
+    assert!(service.exec_query("SELECT c.id, sum(o.amount) FROM foo.customers c JOIN foo.orders o ON o.not_found = c.id")
+        .await.is_err());
+
+    // Join on ambiguous fields.
+    let result = service
+        .exec_query(
+            "SELECT c.id, k.id FROM foo.customers c JOIN foo.customers k ON id = id ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&result), rows(&[("a", "a"), ("b", "b")]));
 }
 
 async fn three_tables_join(service: Box<dyn SqlClient>) {
@@ -686,6 +763,58 @@ async fn numeric_cast(service: Box<dyn SqlClient>) {
     assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(3)]));
 }
 
+async fn numbers_to_bool(service: Box<dyn SqlClient>) {
+    let r = service
+        .exec_query("SELECT 1 = TRUE, FALSE = 0, -1 = TRUE, 123 = TRUE")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(true, true, true, true)]));
+
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.bools (b boolean, i int)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.bools(b, i) VALUES (true, 0), (false, 0), (true, 123), (false, 123)",
+        )
+        .await
+        .unwrap();
+
+    // Compare array with constant.
+    let r = service
+        .exec_query("SELECT b, b = 1, b = 0, b = 123 FROM s.bools GROUP BY 1, 2, 3 ORDER BY 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(false, false, true, false), (true, true, false, true)])
+    );
+
+    // Compare array with array.
+    let r = service
+        .exec_query("SELECT b, i, b = i FROM s.bools ORDER BY 1, 2")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (false, 0, true),
+            (false, 123, false),
+            (true, 0, false),
+            (true, 123, true)
+        ])
+    );
+
+    // Other types work fine.
+    let r = service
+        .exec_query("SELECT 1 = 1, '1' = 1, 'foo' = 'foo'")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(true, true, true)]))
+}
+
 async fn union(service: Box<dyn SqlClient>) {
     let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
 
@@ -763,6 +892,31 @@ async fn timestamp_select(service: Box<dyn SqlClient>) {
     let result = service.exec_query("SELECT count(*) from foo.timestamps WHERE t >= to_timestamp('2020-01-02T00:00:00.000Z')").await.unwrap();
 
     assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(4)]));
+}
+
+async fn timestamp_seconds_frac(service: Box<dyn SqlClient>) {
+    for s in &[
+        "1970-01-01T00:00:00.123Z",
+        "1970-01-01T00:00:00.123",
+        "1970-01-01 00:00:00.123Z",
+        "1970-01-01 00:00:00.123 UTC",
+    ] {
+        assert_eq!(
+            timestamp_from_string(s).expect(s).get_time_stamp(),
+            123000000,
+            "input {}",
+            s
+        );
+        if s.ends_with("UTC") {
+            // Currently accepted only on ingestion.
+            continue;
+        }
+        let r = service
+            .exec_query(&format!("SELECT to_timestamp('{}')", s))
+            .await
+            .unwrap();
+        assert_eq!(to_rows(&r), rows(&[TimestampValue::new(123000000)]));
+    }
 }
 
 async fn column_escaping(service: Box<dyn SqlClient>) {
@@ -935,6 +1089,76 @@ async fn convert_tz(service: Box<dyn SqlClient>) {
     );
 }
 
+async fn ilike(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.strings(t text, pat text)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.strings(t, pat) \
+             VALUES ('aba', '%ABA'), ('ABa', '%aba%'), ('CABA', 'aba%'), ('ZABA', '%a%b%a%'), ('ZZZ', 'zzz'), ('TTT', 'TTT')",
+        )
+        .await
+        .unwrap();
+    let r = service
+        .exec_query("SELECT t FROM s.strings WHERE t ILIKE '%aBA%' ORDER BY t")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&["ABa", "CABA", "ZABA", "aba"]));
+
+    let r = service
+        .exec_query("SELECT t FROM s.strings WHERE t ILIKE 'aBA%' ORDER BY t")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&["ABa", "aba"]));
+
+    let r = service
+        .exec_query("SELECT t FROM s.strings WHERE t ILIKE '%aBA' ORDER BY t")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&["ABa", "CABA", "ZABA", "aba"]));
+
+    let r = service
+        .exec_query("SELECT t FROM s.strings WHERE t ILIKE 'aBA' ORDER BY t")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&["ABa", "aba"]));
+
+    // Compare constant string with a bunch of patterns.
+    // Inputs are: ('aba', '%ABA'), ('ABa', '%aba%'), ('CABA', 'aba%'), ('ZABA', '%a%b%a%'),
+    //             ('ZZZ', 'zzz'), ('TTT', 'TTT').
+    let r = service
+        .exec_query("SELECT pat FROM s.strings WHERE 'aba' ILIKE pat ORDER BY pat")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&["%ABA", "%a%b%a%", "%aba%", "aba%"]));
+
+    // Compare array against array.
+    let r = service
+        .exec_query("SELECT t, pat FROM s.strings WHERE t ILIKE pat ORDER BY t")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            ("ABa", "%aba%"),
+            ("TTT", "TTT"),
+            ("ZABA", "%a%b%a%"),
+            ("ZZZ", "zzz"),
+            ("aba", "%ABA"),
+        ])
+    );
+
+    // Check NOT ILIKE also works.
+    let r = service
+        .exec_query("SELECT t, pat FROM s.strings WHERE t NOT ILIKE pat ORDER BY t")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[("CABA", "aba%")]));
+}
+
 async fn coalesce(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
 
@@ -1016,6 +1240,98 @@ async fn coalesce(service: Box<dyn SqlClient>) {
         .exec_query("SELECT n, coalesce() FROM s.Data ORDER BY 1")
         .await
         .unwrap_err();
+}
+
+async fn count_distinct_crash(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data (n int)")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query("SELECT COUNT(DISTINCT n) FROM s.Data")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), vec![vec![TableValue::Int(0)]]);
+
+    service
+        .exec_query("INSERT INTO s.Data(n) VALUES (1), (2), (3), (3), (4), (4), (4)")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query("SELECT COUNT(DISTINCT n) FROM s.Data WHERE n > 4")
+        .await
+        .unwrap();
+
+    assert_eq!(to_rows(&r), vec![vec![TableValue::Int(0)]]);
+    let r = service
+        .exec_query("SELECT COUNT(DISTINCT CASE WHEN n > 4 THEN n END) FROM s.Data")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), vec![vec![TableValue::Int(0)]]);
+}
+
+async fn count_distinct_group_by_crash(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data (n string)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.Data (n) VALUES ('a'), ('b'), ('c'), ('b'), ('c')")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT n, COUNT(DISTINCT CASE WHEN n <> 'a' THEN n END), COUNT(*) \
+             FROM s.Data \
+             GROUP BY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        vec![
+            vec![
+                TableValue::String("a".to_string()),
+                TableValue::Int(0),
+                TableValue::Int(1)
+            ],
+            vec![
+                TableValue::String("b".to_string()),
+                TableValue::Int(1),
+                TableValue::Int(2)
+            ],
+            vec![
+                TableValue::String("c".to_string()),
+                TableValue::Int(1),
+                TableValue::Int(2)
+            ],
+        ]
+    );
+}
+
+async fn count_distinct_take_crash(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.data(id int, n int)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.data(id, n) VALUES (1, 1)")
+        .await
+        .unwrap();
+    // This used to crash because `take` on empty list returned null. The implementation can easily
+    // change with time, though, so test is not robust.
+    let r = service
+        .exec_query("SELECT n, COUNT(DISTINCT CASE WHEN id = 2 THEN 2 END) FROM s.data GROUP BY n")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(1, 0)]));
 }
 
 async fn create_schema_if_not_exists(service: Box<dyn SqlClient>) {
@@ -1512,6 +1828,26 @@ async fn hyperloglog_inplace_group_by(service: Box<dyn SqlClient>) {
     )
 }
 
+async fn hyperloglog_postgres(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.hlls(id int, hll HLL_POSTGRES)")
+        .await
+        .unwrap();
+    service.exec_query("INSERT INTO s.hlls(id, hll) VALUES \
+        (1, X'118b7f'),\
+        (2, X'128b7fee22c470691a8134'),\
+        (3, X'138b7f04a10642078507c308e309230a420ac10c2510a2114511611363138116811848188218a119411a821ae11f0122e223a125a126632685276327a328e2296129e52b812fe23081320132c133e335a53641368236a23721374237e1382138e13a813c243e6140e341854304434148a24a034f8150c1520152e254e155a1564157e158e35ac25b265b615c615fc1620166a368226a416a626c016c816d677163728275817a637a817ac37b617c247c427d677f6180e18101826382e1846184e18541858287e1880189218a418b818bc38e018ea290a19244938295e4988198c299e29b239b419c419ce49da1a1e1a321a381a4c1aa61acc2ae01b0a1b101b142b161b443b801bd02bd61bf61c263c4a3c501c7a1caa1cb03cd03cf03cf42d123d4c3d662d744d901dd01df81e001e0a2e641e7e3edc1f0a2f1c1f203f484f5c4f763fc84fdc1fe02fea1'),\
+        (4, X'148b7f21083288a4320a12086719c65108c1088422884511063388232904418c8520484184862886528c65198832106328c83114e6214831108518d03208851948511884188441908119083388661842818c43190c320ce4210a50948221083084a421c8328c632104221c4120d01284e20902318ca5214641942319101294641906228483184e128c43188e308882204a538c8328903288642102220c64094631086330c832106320c46118443886329062118a230c63108a320c23204a11852419c6528c85210a318c6308c41088842086308ce7110a418864190650884210ca631064108642a1022186518c8509862109020a0a4318671144150842400e5090631a0811848320c821888120c81114a220880290622906310d0220c83090a118c433106128c221902210cc23106029044114841104409862190c43188111063104c310c6728c8618c62290441102310c23214440882438ca2110a32908548c432110329462188a43946328842114640944320884190c928c442084228863318a2190a318c6618ca3114651886618c44190c5108e2110612144319062284641908428882314862106419883310421988619ca420cc511442104633888218c4428465288651910730c81118821088218c6418c45108452106519ce410d841904218863308622086211483198c710c83104a328c620906218864118623086418c8711423094632186420c4620c41104620a441108e40882628c6311c212046428c8319021104672888428ca320c431984418c4209043084451886510c641108310c4c20c66188472146310ca71084820c621946218c8228822190e2410861904411c27288621144328c6440c6311063190813086228ca710c2218c4718865188c2114850888608864404a3194e22882310ce53088619ca31904519503188e1118c4214cb2948110c6119c2818c843108520c43188c5204821186528c871908311086214c630c4218c8418cc3298a31888210c63110a121042198622886531082098c419c4210c6210c8338c25294610944518c442104610884104424206310c8311462288873102308c2440c451082228824310440982220c4240c622084310c642850118c641148430d0128c8228c2120c221884428863208c21a0a4190a4404c21186548865204633906308ca32086211c8319ce22146520c6120803318a518c840084519461208c21908538cc428c2110844384e40906320c44014a3204e62042408c8328c632146318c812004310c41318e3208a5308a511827104a4188c51048421446090a7088631102231484104473084318c41210860906919083190652906129c4628c45310652848221443114420084500865184a618c81198c32906418c63190e320c231882728484184671888309465188a320c83208632144318c6331c642988108c61218812144328d022844021022184a31908328c6218c2328c4528cc541428190641046418c84108443146230c6419483214232184411863290a210824318c220868194631106618c43188821048230c4128c6310c0330462094241106330c42188c321043118863046438823110a041464108e3190e4209a11902439c43188631104321008090441106218c6419064294a229463594622244320cc71184510902924421908218c62308641044328ca328882111012884120ca52882428c62184442086718c4221c8211082208a321023115270086218c4218c6528ce400482310a520c43104a520c44210811884118c4310864198263942331822')"
+    ).await.unwrap();
+
+    let r = service
+        .exec_query("SELECT id, cardinality(hll) FROM s.hlls ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(1, 0), (2, 1), (3, 164), (4, 9722)]));
+}
+
 async fn hyperloglog_snowflake(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -1555,17 +1891,19 @@ async fn planning_inplace_aggregate(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(
         pp_phys_plan(p.router.as_ref()),
-        "FinalInplaceAggregate\
-          \n  ClusterSend, partitions: [[1]]"
+        "Projection, [url, SUM(s.Data.hits)@1:SUM(hits)]\
+       \n  FinalInplaceAggregate\
+       \n    ClusterSend, partitions: [[1]]"
     );
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
-        "FinalInplaceAggregate\
-           \n  Worker\
-           \n    PartialInplaceAggregate\
-           \n      MergeSort\
-           \n        Scan, index: default:1:[1]:sort_on[url], fields: [url, hits]\
-           \n          Empty"
+        "Projection, [url, SUM(s.Data.hits)@1:SUM(hits)]\
+      \n  FinalInplaceAggregate\
+      \n    Worker\
+      \n      PartialInplaceAggregate\
+      \n        MergeSort\
+      \n          Scan, index: default:1:[1]:sort_on[url], fields: [url, hits]\
+      \n            Empty"
     );
 
     // When there is no index, we fallback to inplace aggregates.
@@ -1575,17 +1913,19 @@ async fn planning_inplace_aggregate(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(
         pp_phys_plan(p.router.as_ref()),
-        "FinalHashAggregate\
-          \n  ClusterSend, partitions: [[1]]"
+        "Projection, [day, SUM(s.Data.hits)@1:SUM(hits)]\
+       \n  FinalHashAggregate\
+       \n    ClusterSend, partitions: [[1]]"
     );
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
-        "FinalHashAggregate\
-           \n  Worker\
-           \n    PartialHashAggregate\
-           \n      Merge\
-           \n        Scan, index: default:1:[1], fields: [day, hits]\
-           \n          Empty"
+        "Projection, [day, SUM(s.Data.hits)@1:SUM(hits)]\
+       \n  FinalHashAggregate\
+       \n    Worker\
+       \n      PartialHashAggregate\
+       \n        Merge\
+       \n          Scan, index: default:1:[1], fields: [day, hits]\
+       \n            Empty"
     );
 }
 
@@ -1734,31 +2074,28 @@ async fn planning_inplace_aggregate2(service: Box<dyn SqlClient>) {
     verbose.show_sort_by = true;
     assert_eq!(
         pp_phys_plan_ext(p.router.as_ref(), &verbose),
-        "Projection, [url, SUM(hits):hits]\
+        "Projection, [url, SUM(Data.hits)@1:hits]\
            \n  AggregateTopK, limit: 10, sortBy: [2 desc]\
            \n    ClusterSend, partitions: [[1, 2]]"
     );
     assert_eq!(
-            pp_phys_plan_ext(p.worker.as_ref(), &verbose),
-            "Projection, [url, SUM(hits):hits]\
+        pp_phys_plan_ext(p.worker.as_ref(), &verbose),
+        "Projection, [url, SUM(Data.hits)@1:hits]\
            \n  AggregateTopK, limit: 10, sortBy: [2 desc]\
            \n    Worker\
-           \n      Sort, by: [SUM(hits) desc]\
+           \n      Sort, by: [SUM(hits)@1 desc]\
            \n        FullInplaceAggregate, sort_order: [0]\
-           \n          Alias, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-           \n            MergeSort, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-           \n              Union, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-           \n                Projection, [allowed, site_id, url, day, hits], single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-           \n                  Filter, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-           \n                    MergeSort, sort_order: [0, 1, 2, 3, 4]\
-           \n                      Scan, index: default:1:[1], fields: *, sort_order: [0, 1, 2, 3, 4]\
-           \n                        Empty\
-           \n                Projection, [allowed, site_id, url, day, hits], single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-           \n                  Filter, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-           \n                    MergeSort, sort_order: [0, 1, 2, 3, 4]\
-           \n                      Scan, index: default:2:[2], fields: *, sort_order: [0, 1, 2, 3, 4]\
-           \n                        Empty"
-        );
+           \n          MergeSort, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
+           \n            Union, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
+           \n              Filter, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
+           \n                MergeSort, sort_order: [0, 1, 2, 3, 4]\
+           \n                  Scan, index: default:1:[1], fields: *, sort_order: [0, 1, 2, 3, 4]\
+           \n                    Empty\
+           \n              Filter, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
+           \n                MergeSort, sort_order: [0, 1, 2, 3, 4]\
+           \n                  Scan, index: default:2:[2], fields: *, sort_order: [0, 1, 2, 3, 4]\
+           \n                    Empty"
+    );
 }
 
 async fn topk_large_inputs(service: Box<dyn SqlClient>) {
@@ -1924,17 +2261,19 @@ async fn planning_simple(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(
         pp_phys_plan(p.router.as_ref()),
-        "FinalInplaceAggregate\
-           \n  ClusterSend, partitions: [[1]]"
+        "Projection, [id, SUM(s.Orders.amount)@1:SUM(amount)]\
+       \n  FinalInplaceAggregate\
+       \n    ClusterSend, partitions: [[1]]"
     );
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
-        "FinalInplaceAggregate\
-           \n  Worker\
-           \n    PartialInplaceAggregate\
-           \n      MergeSort\
-           \n        Scan, index: default:1:[1]:sort_on[id], fields: [id, amount]\
-           \n          Empty"
+        "Projection, [id, SUM(s.Orders.amount)@1:SUM(amount)]\
+       \n  FinalInplaceAggregate\
+       \n    Worker\
+       \n      PartialInplaceAggregate\
+       \n        MergeSort\
+       \n          Scan, index: default:1:[1]:sort_on[id], fields: [id, amount]\
+       \n            Empty"
     );
 
     let p = service
@@ -1950,24 +2289,24 @@ async fn planning_simple(service: Box<dyn SqlClient>) {
     // TODO: test MergeSort node is present if ClusterSend has multiple partitions.
     assert_eq!(
         pp_phys_plan(p.router.as_ref()),
-        "FinalInplaceAggregate\
-           \n  ClusterSend, partitions: [[1, 1]]"
+        "Projection, [id, SUM(amount)]\
+       \n  FinalInplaceAggregate\
+       \n    ClusterSend, partitions: [[1, 1]]"
     );
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
-        "FinalInplaceAggregate\
-           \n  Worker\
-           \n    PartialInplaceAggregate\
-           \n      MergeSort\
-           \n        Union\
-           \n          Projection, [id, amount]\
-           \n            MergeSort\
-           \n              Scan, index: default:1:[1]:sort_on[id], fields: [id, amount]\
-           \n                Empty\
-           \n          Projection, [id, amount]\
-           \n            MergeSort\
-           \n              Scan, index: default:1:[1]:sort_on[id], fields: [id, amount]\
-           \n                Empty"
+        "Projection, [id, SUM(amount)]\
+       \n  FinalInplaceAggregate\
+       \n    Worker\
+       \n      PartialInplaceAggregate\
+       \n        MergeSort\
+       \n          Union\
+       \n            MergeSort\
+       \n              Scan, index: default:1:[1]:sort_on[id], fields: [id, amount]\
+       \n                Empty\
+       \n            MergeSort\
+       \n              Scan, index: default:1:[1]:sort_on[id], fields: [id, amount]\
+       \n                Empty"
     );
 }
 
@@ -2001,16 +2340,14 @@ async fn planning_joins(service: Box<dyn SqlClient>) {
     assert_eq!(
             pp_phys_plan(p.worker.as_ref()),
             "Worker\
-                  \n  Projection, [order_id, customer_name]\
-                  \n    MergeJoin, on: [o.customer_id = c.customer_id]\
-                  \n      Alias\
-                  \n        MergeSort\
-                  \n          Scan, index: by_customer:2:[2]:sort_on[customer_id], fields: [customer_id, order_id]\
-                  \n            Empty\
-                  \n      Alias\
-                  \n        MergeSort\
-                  \n          Scan, index: default:3:[3]:sort_on[customer_id], fields: *\
-                  \n            Empty"
+           \n  Projection, [order_id, customer_name]\
+           \n    MergeJoin, on: [customer_id@1 = customer_id@0]\
+           \n      MergeSort\
+           \n        Scan, index: by_customer:2:[2]:sort_on[customer_id], fields: [order_id, customer_id]\
+           \n          Empty\
+           \n      MergeSort\
+           \n        Scan, index: default:3:[3]:sort_on[customer_id], fields: *\
+           \n          Empty"
         );
 
     let p = service
@@ -2026,24 +2363,24 @@ async fn planning_joins(service: Box<dyn SqlClient>) {
     assert_eq!(
         pp_phys_plan(p.router.as_ref()),
         "Sort\
-                  \n  FinalHashAggregate\
-                  \n    ClusterSend, partitions: [[2, 3]]"
+       \n  Projection, [order_id, customer_name, SUM(o.amount)@2:SUM(amount)]\
+       \n    FinalHashAggregate\
+       \n      ClusterSend, partitions: [[2, 3]]"
     );
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
         "Sort\
-                  \n  FinalHashAggregate\
-                  \n    Worker\
-                  \n      PartialHashAggregate\
-                  \n        MergeJoin, on: [o.customer_id = c.customer_id]\
-                  \n          Alias\
-                  \n            MergeSort\
-                  \n              Scan, index: by_customer:2:[2]:sort_on[customer_id], fields: *\
-                  \n                Empty\
-                  \n          Alias\
-                  \n            MergeSort\
-                  \n              Scan, index: default:3:[3]:sort_on[customer_id], fields: *\
-                  \n                Empty"
+       \n  Projection, [order_id, customer_name, SUM(o.amount)@2:SUM(amount)]\
+       \n    FinalHashAggregate\
+       \n      Worker\
+       \n        PartialHashAggregate\
+       \n          MergeJoin, on: [customer_id@1 = customer_id@0]\
+       \n            MergeSort\
+       \n              Scan, index: by_customer:2:[2]:sort_on[customer_id], fields: *\
+       \n                Empty\
+       \n            MergeSort\
+       \n              Scan, index: default:3:[3]:sort_on[customer_id], fields: *\
+       \n                Empty"
     );
 }
 
@@ -2085,21 +2422,18 @@ async fn planning_3_table_joins(service: Box<dyn SqlClient>) {
             pp_phys_plan(p.worker.as_ref()),
             "Worker\
            \n  Projection, [order_id, customer_name, product_name]\
-           \n    MergeJoin, on: [o.product_id = p.product_id]\
+           \n    MergeJoin, on: [product_id@2 = product_id@0]\
            \n      MergeResort\
-           \n        MergeJoin, on: [o.customer_id = c.customer_id]\
-           \n          Alias\
-           \n            MergeSort\
-           \n              Scan, index: by_customer:2:[2]:sort_on[customer_id], fields: [customer_id, order_id, product_id]\
-           \n                Empty\
-           \n          Alias\
-           \n            MergeSort\
-           \n              Scan, index: default:3:[3]:sort_on[customer_id], fields: *\
-           \n                Empty\
-           \n      Alias\
-           \n        MergeSort\
-           \n          Scan, index: default:4:[4]:sort_on[product_id], fields: *\
-           \n            Empty",
+           \n        MergeJoin, on: [customer_id@1 = customer_id@0]\
+           \n          MergeSort\
+           \n            Scan, index: by_customer:2:[2]:sort_on[customer_id], fields: [order_id, customer_id, product_id]\
+           \n              Empty\
+           \n          MergeSort\
+           \n            Scan, index: default:3:[3]:sort_on[customer_id], fields: *\
+           \n              Empty\
+           \n      MergeSort\
+           \n        Scan, index: default:4:[4]:sort_on[product_id], fields: *\
+           \n          Empty",
         );
 
     let p = service
@@ -2120,23 +2454,20 @@ async fn planning_3_table_joins(service: Box<dyn SqlClient>) {
             pp_phys_plan_ext(p.worker.as_ref(), &show_filters),
             "Worker\
            \n  Projection, [order_id, customer_name, product_name]\
-           \n    MergeJoin, on: [o.product_id = p.product_id]\
+           \n    MergeJoin, on: [product_id@2 = product_id@0]\
            \n      MergeResort\
-           \n        MergeJoin, on: [o.customer_id = c.customer_id]\
-           \n          Filter, predicate: product_id = 125\
-           \n            Alias\
-           \n              MergeSort\
-           \n                Scan, index: by_customer:2:[2]:sort_on[customer_id], fields: [customer_id, order_id, product_id], predicate: #product_id Eq Int64(125)\
-           \n                  Empty\
-           \n          Alias\
+           \n        MergeJoin, on: [customer_id@1 = customer_id@0]\
+           \n          Filter, predicate: product_id@2 = 125\
            \n            MergeSort\
-           \n              Scan, index: default:3:[3]:sort_on[customer_id], fields: *\
+           \n              Scan, index: by_customer:2:[2]:sort_on[customer_id], fields: [order_id, customer_id, product_id], predicate: #product_id Eq Int64(125)\
            \n                Empty\
-           \n      Filter, predicate: product_id = 125\
-           \n        Alias\
            \n          MergeSort\
-           \n            Scan, index: default:4:[4]:sort_on[product_id], fields: *, predicate: #product_id Eq Int64(125)\
-           \n              Empty",
+           \n            Scan, index: default:3:[3]:sort_on[customer_id], fields: *\
+           \n              Empty\
+           \n      Filter, predicate: product_id@0 = 125\
+           \n        MergeSort\
+           \n          Scan, index: default:4:[4]:sort_on[product_id], fields: *, predicate: #product_id Eq Int64(125)\
+           \n            Empty",
         );
 }
 
@@ -2248,12 +2579,6 @@ async fn topk_query(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     assert_eq!(to_rows(&r), rows(&[("a", 1), ("e", 35), ("d", 40)]));
-
-    fn rows(a: &[(&str, i64)]) -> Vec<Vec<TableValue>> {
-        a.iter()
-            .map(|(s, i)| vec![TableValue::String(s.to_string()), TableValue::Int(*i)])
-            .collect_vec()
-    }
 }
 
 async fn topk_decimals(service: Box<dyn SqlClient>) {
@@ -2288,18 +2613,10 @@ async fn topk_decimals(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap();
-    assert_eq!(to_rows(&r), rows(&[("z", 100), ("y", 80), ("b", 52)]));
-
-    fn rows(a: &[(&str, i64)]) -> Vec<Vec<TableValue>> {
-        a.iter()
-            .map(|(s, i)| {
-                vec![
-                    TableValue::String(s.to_string()),
-                    TableValue::Decimal(Decimal::new(*i * 100_000)),
-                ]
-            })
-            .collect_vec()
-    }
+    assert_eq!(
+        to_rows(&r),
+        rows(&[("z", dec5(100)), ("y", dec5(80)), ("b", dec5(52))])
+    );
 }
 
 async fn offset(service: Box<dyn SqlClient>) {
@@ -2350,12 +2667,6 @@ async fn offset(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     assert_eq!(to_rows(&r), rows(&["h", "g", "f"]));
-
-    fn rows(a: &[&str]) -> Vec<Vec<TableValue>> {
-        a.iter()
-            .map(|s| vec![TableValue::String(s.to_string())])
-            .collect_vec()
-    }
 }
 
 async fn having(service: Box<dyn SqlClient>) {
@@ -2426,12 +2737,6 @@ async fn having(service: Box<dyn SqlClient>) {
         )
         .await;
     assert!(err.is_err());
-
-    fn rows(a: &[(&str, i64)]) -> Vec<Vec<TableValue>> {
-        a.iter()
-            .map(|(s, n)| vec![TableValue::String(s.to_string()), TableValue::Int(*n)])
-            .collect_vec()
-    }
 }
 
 async fn rolling_window_join(service: Box<dyn SqlClient>) {
@@ -2469,16 +2774,15 @@ async fn rolling_window_join(service: Box<dyn SqlClient>) {
     assert_eq!(
         pp_phys_plan(plan.as_ref()),
         "Sort\
-      \n  Projection, [date_to, name, SUM(n):n]\
-      \n    CrossJoinAgg, on: day <= date_to\
-      \n      Alias\
-      \n        Projection, [day, name, SUM(n):n]\
-      \n          FinalHashAggregate\
-      \n            Worker\
-      \n              PartialHashAggregate\
-      \n                Merge\
-      \n                  Scan, index: default:1:[1], fields: *\
-      \n                    Empty"
+      \n  Projection, [date_to, name, SUM(Table.n)@2:n]\
+      \n    CrossJoinAgg, on: day@1 <= date_to@0\
+      \n      Projection, [datetrunc(Utf8(\"day\"),converttz(s.Data.day,Utf8(\"+00:00\")))@0:day, name, SUM(s.Data.n)@2:n]\
+      \n        FinalHashAggregate\
+      \n          Worker\
+      \n            PartialHashAggregate\
+      \n              Merge\
+      \n                Scan, index: default:1:[1], fields: *\
+      \n                  Empty"
     );
 
     let plan = service
@@ -2490,17 +2794,15 @@ async fn rolling_window_join(service: Box<dyn SqlClient>) {
         pp_phys_plan(plan.as_ref()),
         "Sort\
         \n  Projection, [date_to, name, n]\
-        \n    Alias\
-        \n      Projection, [date_to, name, SUM(n):n]\
-        \n        CrossJoinAgg, on: day <= date_to\
-        \n          Alias\
-        \n            Projection, [day, name, SUM(n):n]\
-        \n              FinalHashAggregate\
-        \n                Worker\
-        \n                  PartialHashAggregate\
-        \n                    Merge\
-        \n                      Scan, index: default:1:[1], fields: *\
-        \n                        Empty"
+        \n    Projection, [date_to, name, SUM(Table.n)@2:n]\
+        \n      CrossJoinAgg, on: day@1 <= date_to@0\
+        \n        Projection, [datetrunc(Utf8(\"day\"),converttz(s.Data.day,Utf8(\"+00:00\")))@0:day, name, SUM(s.Data.n)@2:n]\
+        \n          FinalHashAggregate\
+        \n            Worker\
+        \n              PartialHashAggregate\
+        \n                Merge\
+        \n                  Scan, index: default:1:[1], fields: *\
+        \n                    Empty"
     );
 
     service
@@ -2536,18 +2838,674 @@ async fn rolling_window_join(service: Box<dyn SqlClient>) {
             ])
         );
     }
+}
 
-    fn rows(a: &[(TimestampValue, &str, i64)]) -> Vec<Vec<TableValue>> {
-        a.iter()
-            .map(|(t, s, n)| {
-                vec![
-                    TableValue::Timestamp(*t),
-                    TableValue::String(s.to_string()),
-                    TableValue::Int(*n),
-                ]
-            })
-            .collect_vec()
-    }
+async fn rolling_window_query(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data(day int, name text, n int)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.Data(day, name, n) VALUES (1, 'john', 10), \
+                                                     (1, 'sara', 7), \
+                                                     (3, 'sara', 3), \
+                                                     (3, 'john', 9), \
+                                                     (3, 'john', 11), \
+                                                     (5, 'timmy', 5)",
+        )
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE 1 PRECEDING) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(1, 17), (2, 17), (3, 23), (4, 23), (5, 5)])
+    );
+
+    // Same, without preceding, i.e. with missing nodes.
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE 0 PRECEDING) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (1, Some(17)),
+            (2, None),
+            (3, Some(23)),
+            (4, None),
+            (5, Some(5))
+        ])
+    );
+
+    // Unbounded windows.
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE UNBOUNDED PRECEDING) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(1, 17), (2, 17), (3, 40), (4, 40), (5, 45)]),
+    );
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(1, 45), (2, 28), (3, 28), (4, 5), (5, 5)])
+    );
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(1, 45), (2, 45), (3, 45), (4, 45), (5, 45)])
+    );
+    // Combined windows.
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE BETWEEN 1 PRECEDING AND 1 FOLLOWING) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(1, 17), (2, 40), (3, 23), (4, 28), (5, 5)])
+    );
+    // Both bounds are either PRECEDING or FOLLOWING.
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE BETWEEN 1 FOLLOWING and 2 FOLLOWING) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (1, Some(23)),
+            (2, Some(23)),
+            (3, Some(5)),
+            (4, Some(5)),
+            (5, None)
+        ])
+    );
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE BETWEEN 2 PRECEDING and 1 PRECEDING) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (1, None),
+            (2, Some(17)),
+            (3, Some(17)),
+            (4, Some(23)),
+            (5, Some(23))
+        ])
+    );
+    // Empty inputs.
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE 0 PRECEDING) \
+             FROM (SELECT day, n FROM s.Data WHERE day = 123123123) \
+             ROLLING_WINDOW DIMENSION day \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), vec![] as Vec<Vec<_>>);
+
+    // Broader range step than input data.
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE BETWEEN 1 PRECEDING AND 2 FOLLOWING) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             FROM 1 TO 5 EVERY 4 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(1, 40), (5, 5)]));
+
+    // Dimension values not in the input data.
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE BETWEEN 1 PRECEDING AND 2 FOLLOWING) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             FROM -10 TO 10 EVERY 5 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (-10, None),
+            (-5, None),
+            (0, Some(17)),
+            (5, Some(5)),
+            (10, None)
+        ])
+    );
+
+    // Partition by clause.
+    let r = service
+        .exec_query(
+            "SELECT day, name, ROLLING(SUM(n) RANGE 2 PRECEDING) \
+             FROM (SELECT day, name, SUM(n) as n FROM s.Data GROUP BY 1, 2) \
+             ROLLING_WINDOW DIMENSION day \
+             PARTITION BY name \
+             FROM 1 TO 5 EVERY 2 \
+             ORDER BY 1, 2",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (1, "john", 10),
+            (1, "sara", 7),
+            (3, "john", 30),
+            (3, "sara", 10),
+            (5, "john", 20),
+            (5, "sara", 3),
+            (5, "timmy", 5)
+        ])
+    );
+
+    let r = service
+        .exec_query(
+            "SELECT day, name, ROLLING(SUM(n) RANGE 1 PRECEDING) \
+             FROM (SELECT day, name, SUM(n) as n FROM s.Data GROUP BY 1, 2) \
+             ROLLING_WINDOW DIMENSION day \
+             PARTITION BY name \
+             FROM 1 TO 5 EVERY 2 \
+             ORDER BY 1, 2",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (1, "john", 10),
+            (1, "sara", 7),
+            (3, "john", 20),
+            (3, "sara", 3),
+            (5, "timmy", 5)
+        ])
+    );
+
+    // Missing dates must be filled.
+    let r = service
+        .exec_query(
+            "SELECT day, name, ROLLING(SUM(n) RANGE CURRENT ROW) \
+             FROM (SELECT day, name, SUM(n) as n FROM s.Data GROUP BY 1, 2) \
+             ROLLING_WINDOW DIMENSION day \
+             PARTITION BY name \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1, 2",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (1, Some("john"), Some(10)),
+            (1, Some("sara"), Some(7)),
+            (2, None, None),
+            (3, Some("john"), Some(20)),
+            (3, Some("sara"), Some(3)),
+            (4, None, None),
+            (5, Some("timmy"), Some(5))
+        ])
+    );
+
+    // Check for errors.
+    // GROUP BY not allowed with ROLLING.
+    service
+        .exec_query("SELECT day, ROLLING(SUM(n) RANGE 2 PRECEDING) FROM s.Data GROUP BY 1 ROLLING_WINDOW DIMENSION day FROM 0 TO 10 EVERY 2")
+        .await
+        .unwrap_err();
+    // Rolling aggregate without ROLLING_WINDOW.
+    service
+        .exec_query("SELECT day, ROLLING(SUM(n) RANGE 2 PRECEDING) FROM s.Data")
+        .await
+        .unwrap_err();
+    // ROLLING_WINDOW without rolling aggregate.
+    service
+        .exec_query("SELECT day, n FROM s.Data ROLLING_WINDOW DIMENSION day FROM 0 to 10 EVERY 2")
+        .await
+        .unwrap_err();
+    // No RANGE in rolling aggregate.
+    service
+        .exec_query("SELECT day, ROLLING(SUM(n)) FROM s.Data ROLLING_WINDOW DIMENSION day FROM 0 to 10 EVERY 2")
+        .await
+        .unwrap_err();
+    // No DIMENSION.
+    service
+        .exec_query("SELECT day, ROLLING(SUM(n) RANGE 2 PRECEDING) FROM s.Data ROLLING_WINDOW FROM 0 to 10 EVERY 2")
+        .await
+        .unwrap_err();
+    // Invalid DIMENSION.
+    service
+        .exec_query("SELECT day, ROLLING(SUM(n) RANGE 2 PRECEDING) FROM s.Data ROLLING_WINDOW DIMENSION unknown FROM 0 to 10 EVERY 2")
+        .await
+        .unwrap_err();
+    // Invalid types in FROM, TO, EVERY.
+    service
+        .exec_query("SELECT day, ROLLING(SUM(n) RANGE 2 PRECEDING) FROM s.Data ROLLING_WINDOW DIMENSION day FROM 'a' to 10 EVERY 1")
+        .await
+        .unwrap_err();
+    service
+        .exec_query("SELECT day, ROLLING(SUM(n) RANGE 2 PRECEDING) FROM s.Data ROLLING_WINDOW DIMENSION day FROM 0 to 'a' EVERY 1")
+        .await
+        .unwrap_err();
+    service
+        .exec_query("SELECT day, ROLLING(SUM(n) RANGE 2 PRECEDING) FROM s.Data ROLLING_WINDOW DIMENSION day FROM 0 to 10 EVERY 'a'")
+        .await
+        .unwrap_err();
+    // Invalid values for FROM, TO, EVERY
+    service
+        .exec_query("SELECT day, ROLLING(SUM(n) RANGE 2 PRECEDING) FROM s.Data ROLLING_WINDOW DIMENSION day FROM 0 to 10 EVERY 0")
+        .await
+        .unwrap_err();
+    service
+        .exec_query("SELECT day, ROLLING(SUM(n) RANGE 2 PRECEDING) FROM s.Data ROLLING_WINDOW DIMENSION day FROM 0 to 10 EVERY -10")
+        .await
+        .unwrap_err();
+    service
+        .exec_query("SELECT day, ROLLING(SUM(n) RANGE 2 PRECEDING) FROM s.Data ROLLING_WINDOW DIMENSION day FROM 10 to 0 EVERY 10")
+        .await
+        .unwrap_err();
+}
+
+async fn rolling_window_exprs(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.data(day int, n int)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.data(day, n) VALUES(1, 10), (2, 20), (3, 30)")
+        .await
+        .unwrap();
+    let r = service
+        .exec_query(
+            "SELECT ROLLING(SUM(n) RANGE 1 PRECEDING) / ROLLING(COUNT(n) RANGE 1 PRECEDING),\
+                    ROLLING(AVG(n) RANGE 1 PRECEDING) \
+             FROM (SELECT * FROM s.data) \
+             ROLLING_WINDOW DIMENSION day FROM 1 to 3 EVERY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(10, 10.), (15, 15.), (25, 25.)]))
+}
+
+async fn rolling_window_query_timestamps(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.data(day timestamp, name string, n int)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.data(day, name, n)\
+                        VALUES \
+                         ('2021-01-01T00:00:00Z', 'john', 10), \
+                         ('2021-01-01T00:00:00Z', 'sara', 7), \
+                         ('2021-01-03T00:00:00Z', 'sara', 3), \
+                         ('2021-01-03T00:00:00Z', 'john', 9), \
+                         ('2021-01-03T00:00:00Z', 'john', 11), \
+                         ('2021-01-05T00:00:00Z', 'timmy', 5)",
+        )
+        .await
+        .unwrap();
+
+    let mut jan = (1..=5)
+        .map(|d| timestamp_from_string(&format!("2021-01-{:02}T00:00:00.000Z", d)).unwrap())
+        .collect_vec();
+    jan.insert(0, jan[1]); // jan[i] will correspond to i-th day of the month.
+
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE INTERVAL '1 day' PRECEDING) \
+             FROM (SELECT day, SUM(n) as n FROM s.data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+               FROM to_timestamp('2021-01-01T00:00:00Z') \
+               TO to_timestamp('2021-01-05T00:00:00Z') \
+               EVERY INTERVAL '1 day' \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (jan[1], 17),
+            (jan[2], 17),
+            (jan[3], 23),
+            (jan[4], 23),
+            (jan[5], 5)
+        ])
+    );
+}
+
+async fn rolling_window_extra_aggregate(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data(day int, name text, n int)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.Data(day, name, n) VALUES (1, 'john', 10), \
+                                                     (1, 'sara', 7), \
+                                                     (3, 'sara', 3), \
+                                                     (3, 'john', 9), \
+                                                     (3, 'john', 11), \
+                                                     (5, 'timmy', 5)",
+        )
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE 1 PRECEDING), SUM(n) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             GROUP BY DIMENSION day \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (1, 17, Some(17)),
+            (2, 17, None),
+            (3, 23, Some(23)),
+            (4, 23, None),
+            (5, 5, Some(5))
+        ])
+    );
+
+    // We could also distribute differently.
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE 1 PRECEDING), SUM(n) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             GROUP BY DIMENSION CASE WHEN day <= 3 THEN 1 ELSE 5 END \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (1, 17, Some(40)),
+            (2, 17, None),
+            (3, 23, None),
+            (4, 23, None),
+            (5, 5, Some(5))
+        ])
+    );
+
+    // Putting everything into an out-of-range dimension.
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE 1 PRECEDING), SUM(n) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             GROUP BY DIMENSION 6 \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (1, 17, NULL),
+            (2, 17, NULL),
+            (3, 23, NULL),
+            (4, 23, NULL),
+            (5, 5, NULL)
+        ])
+    );
+
+    // Check errors.
+    // Mismatched types.
+    service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE 1 PRECEDING), SUM(n) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             GROUP BY DIMENSION 'aaa' \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap_err();
+    // Aggregate without GROUP BY DIMENSION.
+    service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE 1 PRECEDING), SUM(n) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap_err();
+    // GROUP BY DIMENSION without aggregates.
+    service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE 1 PRECEDING) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             GROUP BY DIMENSION 0 \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap_err();
+}
+
+async fn rolling_window_extra_aggregate_timestamps(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.data(day timestamp, name string, n int)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.data(day, name, n)\
+                        VALUES \
+                         ('2021-01-01T00:00:00Z', 'john', 10), \
+                         ('2021-01-01T00:00:00Z', 'sara', 7), \
+                         ('2021-01-03T00:00:00Z', 'sara', 3), \
+                         ('2021-01-03T00:00:00Z', 'john', 9), \
+                         ('2021-01-03T00:00:00Z', 'john', 11), \
+                         ('2021-01-05T00:00:00Z', 'timmy', 5)",
+        )
+        .await
+        .unwrap();
+
+    let mut jan = (1..=5)
+        .map(|d| timestamp_from_string(&format!("2021-01-{:02}T00:00:00.000Z", d)).unwrap())
+        .collect_vec();
+    jan.insert(0, jan[1]); // jan[i] will correspond to i-th day of the month.
+
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE INTERVAL '1 day' PRECEDING), SUM(n) \
+             FROM (SELECT day, SUM(n) as n FROM s.data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             GROUP BY DIMENSION day \
+             FROM date_trunc('day', to_timestamp('2021-01-01T00:00:00Z')) \
+             TO date_trunc('day', to_timestamp('2021-01-05T00:00:00Z')) \
+             EVERY INTERVAL '1 day' \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (jan[1], 17, Some(17)),
+            (jan[2], 17, None),
+            (jan[3], 23, Some(23)),
+            (jan[4], 23, None),
+            (jan[5], 5, Some(5))
+        ])
+    );
+}
+
+async fn rolling_window_one_week_interval(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.data(day timestamp, name string, n int)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.data(day, name, n)\
+                        VALUES \
+                         ('2021-01-01T00:00:00Z', 'john', 10), \
+                         ('2021-01-01T00:00:00Z', 'sara', 7), \
+                         ('2021-01-03T00:00:00Z', 'sara', 3), \
+                         ('2021-01-03T00:00:00Z', 'john', 9), \
+                         ('2021-01-03T00:00:00Z', 'john', 11), \
+                         ('2021-01-05T00:00:00Z', 'timmy', 5)",
+        )
+        .await
+        .unwrap();
+
+    let mut jan = (1..=11)
+        .map(|d| timestamp_from_string(&format!("2021-01-{:02}T00:00:00.000Z", d)).unwrap())
+        .collect_vec();
+    jan.insert(0, jan[1]); // jan[i] will correspond to i-th day of the month.
+
+    let r = service
+        .exec_query(
+            "SELECT w, ROLLING(SUM(n) RANGE UNBOUNDED PRECEDING OFFSET START), SUM(CASE WHEN w >= to_timestamp('2021-01-04T00:00:00Z') AND w < to_timestamp('2021-01-11T00:00:00Z') THEN n END) \
+             FROM (SELECT date_trunc('day', day) w, SUM(n) as n FROM s.data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION w \
+             GROUP BY DIMENSION date_trunc('week', w) \
+             FROM date_trunc('week', to_timestamp('2021-01-04T00:00:00Z')) \
+             TO date_trunc('week', to_timestamp('2021-01-11T00:00:00Z')) \
+             EVERY INTERVAL '1 week' \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(jan[4], 40, Some(5)), (jan[11], 45, None),])
+    );
+}
+
+async fn rolling_window_offsets(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.data(day int, n int)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("INSERT INTO s.data(day, n) VALUES (1, 1), (2, 2), (3, 3), (5, 5), (9, 9)")
+        .await
+        .unwrap();
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE UNBOUNDED PRECEDING OFFSET END) \
+             FROM s.data \
+             ROLLING_WINDOW DIMENSION day FROM 0 TO 10 EVERY 2 \
+             ORDER BY day",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(0, 1), (2, 6), (4, 11), (6, 11), (8, 20), (10, 20)])
+    );
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE BETWEEN 1 PRECEDING AND 1 FOLLOWING OFFSET END) \
+             FROM s.data \
+             ROLLING_WINDOW DIMENSION day FROM 0 TO 10 EVERY 2 \
+             ORDER BY day",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (0, Some(3)),
+            (2, Some(5)),
+            (4, Some(5)),
+            (6, None),
+            (8, Some(9)),
+            (10, None)
+        ])
+    );
 }
 
 async fn decimal_index(service: Box<dyn SqlClient>) {
@@ -2569,24 +3527,20 @@ async fn decimal_index(service: Box<dyn SqlClient>) {
         .exec_query("SELECT * FROM s.Data ORDER BY x")
         .await
         .unwrap();
-    assert_eq!(to_rows(&r), rows(&[(1, 2), (2, 3), (3, 4)]));
+
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(dec5(1), dec5(2)), (dec5(2), dec5(3)), (dec5(3), dec5(4))])
+    );
 
     let r = service
         .exec_query("SELECT * FROM s.Data ORDER BY y DESC")
         .await
         .unwrap();
-    assert_eq!(to_rows(&r), rows(&[(3, 4), (2, 3), (1, 2)]));
-
-    fn rows(a: &[(i64, i64)]) -> Vec<Vec<TableValue>> {
-        a.iter()
-            .map(|(x, y)| {
-                vec![
-                    TableValue::Decimal(Decimal::new(x * 100000)),
-                    TableValue::Decimal(Decimal::new(y * 100000)),
-                ]
-            })
-            .collect_vec()
-    }
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(dec5(3), dec5(4)), (dec5(2), dec5(3)), (dec5(1), dec5(2))])
+    );
 }
 
 async fn float_index(service: Box<dyn SqlClient>) {
@@ -2615,17 +3569,219 @@ async fn float_index(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     assert_eq!(to_rows(&r), rows(&[(3., 4.), (2., 3.), (1., 2.)]));
+}
 
-    fn rows(a: &[(f64, f64)]) -> Vec<Vec<TableValue>> {
-        a.iter()
-            .map(|(x, y)| {
-                vec![
-                    TableValue::Float((*x).into()),
-                    TableValue::Float((*y).into()),
-                ]
-            })
-            .collect_vec()
-    }
+async fn date_add(service: Box<dyn SqlClient>) {
+    let check_fun = |name, t, i, expected| {
+        let expected = timestamp_from_string(expected).unwrap();
+        let service = &service;
+        async move {
+            let actual = service
+                .exec_query(&format!(
+                    "SELECT {}(CAST('{}' as TIMESTAMP), INTERVAL '{}')",
+                    name, t, i
+                ))
+                .await
+                .unwrap();
+            assert_eq!(to_rows(&actual), rows(&[expected]));
+        }
+    };
+    let check_adds_to = |t, i, expected| check_fun("DATE_ADD", t, i, expected);
+    let check_subs_to = |t, i, expected| check_fun("DATE_SUB", t, i, expected);
+
+    check_adds_to("2021-01-01T00:00:00Z", "1 second", "2021-01-01T00:00:01Z").await;
+    check_adds_to("2021-01-01T00:00:00Z", "1 minute", "2021-01-01T00:01:00Z").await;
+    check_adds_to("2021-01-01T00:00:00Z", "1 hour", "2021-01-01T01:00:00Z").await;
+    check_adds_to("2021-01-01T00:00:00Z", "1 day", "2021-01-02T00:00:00Z").await;
+
+    check_adds_to(
+        "2021-01-01T00:00:00Z",
+        "1 day 1 hour 1 minute 1 second",
+        "2021-01-02T01:01:01Z",
+    )
+    .await;
+    check_subs_to(
+        "2021-01-02T01:01:01Z",
+        "1 day 1 hour 1 minute 1 second",
+        "2021-01-01T00:00:00Z",
+    )
+    .await;
+
+    check_adds_to("2021-01-01T00:00:00Z", "1 month", "2021-02-01T00:00:00Z").await;
+
+    check_adds_to("2021-01-01T00:00:00Z", "1 year", "2022-01-01T00:00:00Z").await;
+    check_subs_to("2022-01-01T00:00:00Z", "1 year", "2021-01-01T00:00:00Z").await;
+
+    check_adds_to("2021-01-01T00:00:00Z", "13 month", "2022-02-01T00:00:00Z").await;
+    check_subs_to("2022-02-01T00:00:00Z", "13 month", "2021-01-01T00:00:00Z").await;
+
+    check_adds_to("2021-01-01T23:59:00Z", "1 minute", "2021-01-02T00:00:00Z").await;
+    check_subs_to("2021-01-02T00:00:00Z", "1 minute", "2021-01-01T23:59:00Z").await;
+
+    check_adds_to("2021-12-01T00:00:00Z", "1 month", "2022-01-01T00:00:00Z").await;
+    check_subs_to("2022-01-01T00:00:00Z", "1 month", "2021-12-01T00:00:00Z").await;
+
+    check_adds_to("2021-12-31T00:00:00Z", "1 day", "2022-01-01T00:00:00Z").await;
+    check_subs_to("2022-01-01T00:00:00Z", "1 day", "2021-12-31T00:00:00Z").await;
+
+    // Feb 29 on leap and non-leap years.
+    check_adds_to("2020-02-29T00:00:00Z", "1 day", "2020-03-01T00:00:00Z").await;
+    check_subs_to("2020-03-01T00:00:00Z", "1 day", "2020-02-29T00:00:00Z").await;
+
+    check_adds_to("2020-02-28T00:00:00Z", "1 day", "2020-02-29T00:00:00Z").await;
+    check_subs_to("2020-02-29T00:00:00Z", "1 day", "2020-02-28T00:00:00Z").await;
+
+    check_adds_to("2021-02-28T00:00:00Z", "1 day", "2021-03-01T00:00:00Z").await;
+    check_subs_to("2021-03-01T00:00:00Z", "1 day", "2021-02-28T00:00:00Z").await;
+
+    check_adds_to("2020-02-29T00:00:00Z", "1 year", "2021-02-28T00:00:00Z").await;
+    check_subs_to("2020-02-29T00:00:00Z", "1 year", "2019-02-28T00:00:00Z").await;
+
+    check_adds_to("2020-01-30T00:00:00Z", "1 month", "2020-02-29T00:00:00Z").await;
+    check_subs_to("2020-03-30T00:00:00Z", "1 month", "2020-02-29T00:00:00Z").await;
+
+    check_adds_to("2020-01-29T00:00:00Z", "1 month", "2020-02-29T00:00:00Z").await;
+    check_subs_to("2020-03-29T00:00:00Z", "1 month", "2020-02-29T00:00:00Z").await;
+
+    check_adds_to("2021-01-29T00:00:00Z", "1 month", "2021-02-28T00:00:00Z").await;
+    check_subs_to("2021-03-29T00:00:00Z", "1 month", "2021-02-28T00:00:00Z").await;
+
+    // Nulls.
+    let r = service
+        .exec_query(
+            "SELECT date_add(CAST(NULL as timestamp), INTERVAL '1 month'), \
+                            date_sub(CAST(NULL as timestamp), INTERVAL '3 month')",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(NULL, NULL)]));
+
+    // Invalid types passed to date_add.
+    service
+        .exec_query("SELECT date_add(1, 2)")
+        .await
+        .unwrap_err();
+    service
+        .exec_query("SELECT date_add(CAST('2021-01-01T00:00:00Z' as TIMESTAMP), 2)")
+        .await
+        .unwrap_err();
+    service
+        .exec_query("SELECT date_add(1, INTERVAL '1 second')")
+        .await
+        .unwrap_err();
+    // Too many arguments.
+    service
+        .exec_query("SELECT date_add(1, 2, 3)")
+        .await
+        .unwrap_err();
+    // Too few arguments
+    service.exec_query("SELECT date_add(1)").await.unwrap_err();
+
+    // Must work on columnar data.
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.data(t timestamp)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.data(t) VALUES ('2020-01-01T00:00:00Z'), ('2020-02-01T00:00:00Z'), (NULL)",
+        )
+        .await
+        .unwrap();
+    let r = service
+        .exec_query("SELECT date_add(t, INTERVAL '1 year') FROM s.data ORDER BY 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            None,
+            Some(timestamp_from_string("2021-01-01T00:00:00Z").unwrap()),
+            Some(timestamp_from_string("2021-02-01T00:00:00Z").unwrap())
+        ]),
+    );
+    let r = service
+        .exec_query("SELECT date_add(t, INTERVAL '1 hour') FROM s.data ORDER BY 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            None,
+            Some(timestamp_from_string("2020-01-01T01:00:00Z").unwrap()),
+            Some(timestamp_from_string("2020-02-01T01:00:00Z").unwrap())
+        ]),
+    );
+}
+
+async fn unsorted_merge_assertion(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data1(x int, y int)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.Data1(x,y) VALUES (1, 4), (2, 3), (3, 2)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("CREATE TABLE s.Data2(x int, y int)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.Data2(x,y) VALUES (1, 4), (2, 3), (3, 2)")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT x, y, count(x) \
+             FROM (SELECT * FROM s.Data1 UNION ALL \
+                   SELECT * FROM s.Data2)\
+             GROUP BY y, x \
+             ORDER BY y, x",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(3, 2, 2), (2, 3, 2), (1, 4, 2)]));
+}
+
+async fn unsorted_data_timestamps(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.data(t timestamp, n string)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.data(t, n) VALUES \
+            ('2020-01-01T00:00:00.000000005Z', 'a'), \
+            ('2020-01-01T00:00:00.000000001Z', 'b'), \
+            ('2020-01-01T00:00:00.000000002Z', 'c')",
+        )
+        .await
+        .unwrap();
+
+    // CubeStore currently truncs timestamps to millisecond precision.
+    // This checks we sort trunced precisions on inserts. We rely on implementation details of
+    // CubeStore here.
+    let r = service.exec_query("SELECT t, n FROM s.data").await.unwrap();
+
+    let t = timestamp_from_string("2020-01-01T00:00:00Z").unwrap();
+    assert_eq!(to_rows(&r), rows(&[(t, "a"), (t, "b"), (t, "c")]));
+
+    // This ends up using MergeSortExec, make sure we see no assertions.
+    let r = service
+        .exec_query(
+            "SELECT t, n FROM (SELECT * FROM s.data UNION ALL SELECT * FROM s.data) data \
+        GROUP BY 1, 2 \
+        ORDER BY 1, 2",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(t, "a"), (t, "b"), (t, "c")]));
 }
 
 async fn now(service: Box<dyn SqlClient>) {
@@ -2703,4 +3859,8 @@ fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {
         .iter()
         .map(|r| r.values().clone())
         .collect_vec();
+}
+
+fn dec5(i: i64) -> Decimal {
+    Decimal::new(i * 100_000)
 }

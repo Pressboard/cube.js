@@ -1,24 +1,29 @@
-import { useLayoutEffect, useMemo } from 'react';
-import { Card, Space } from 'antd';
-import styled from 'styled-components';
-import { CloudOutlined, LockOutlined } from '@ant-design/icons';
-import { useHistory } from 'react-router';
+import { LockOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { CubeProvider } from '@cubejs-client/react';
+import { Card, Space } from 'antd';
+import { useLayoutEffect } from 'react';
+import { useHistory } from 'react-router';
+import styled from 'styled-components';
 
 import { Button } from '../../atoms';
-import LivePreviewBar from '../LivePreviewContext/LivePreviewBar';
-import { useCubejsApi, useLivePreviewContext, useSecurityContext } from '../../hooks';
-import DashboardSource from '../../DashboardSource';
+import { useCubejsApi, useSecurityContext } from '../../hooks';
+// import { LightningIcon } from '../../shared/icons/LightningIcon';
+import { ChartRendererStateProvider } from '../QueryTabs/ChartRendererStateProvider';
+import { QueryTabs, QueryTabsProps } from '../QueryTabs/QueryTabs';
+import {
+  RollupDesignerContext,
+  useRollupDesignerContext,
+} from '../RollupDesigner';
 import {
   PlaygroundQueryBuilder,
   PlaygroundQueryBuilderProps,
 } from './components/PlaygroundQueryBuilder';
-import { QueryTabs } from '../QueryTabs/QueryTabs';
 
-const StyledCard: typeof Card = styled(Card)`
+const StyledCard = styled(Card)`
   border-radius: 0;
   border-bottom: 1px;
   min-height: 100%;
+  background: var(--layout-body-background);
 
   & .ant-card-body {
     padding: 0;
@@ -26,30 +31,25 @@ const StyledCard: typeof Card = styled(Card)`
 `;
 
 type QueryBuilderContainerProps = {
-  apiUrl?: string;
-  token?: string;
+  apiUrl: string | null;
+  token: string | null;
 } & Pick<
   PlaygroundQueryBuilderProps,
   | 'defaultQuery'
   | 'initialVizState'
   | 'schemaVersion'
+  | 'dashboardSource'
   | 'onVizStateChanged'
   | 'onSchemaChange'
->;
+> &
+  Pick<QueryTabsProps, 'onTabChange'>;
 
 export function QueryBuilderContainer({
   apiUrl,
   token,
   ...props
 }: QueryBuilderContainerProps) {
-  const dashboardSource = useMemo(() => new DashboardSource(), []);
-
-  const { location } = useHistory();
-  const params = new URLSearchParams(location.search);
-  const query = JSON.parse(params.get('query') || '{}');
-
-  const { token: securityContextToken, setIsModalOpen, refreshToken } = useSecurityContext();
-  const livePreviewContext = useLivePreviewContext();
+  const { token: securityContextToken, setIsModalOpen } = useSecurityContext();
 
   const currentToken = securityContextToken || token;
 
@@ -67,74 +67,104 @@ export function QueryBuilderContainer({
 
   return (
     <CubeProvider cubejsApi={cubejsApi}>
-      <StyledCard bordered={false}>
-        <QueryTabs
-          query={query}
-          sidebar={
-            <Space direction="horizontal">
-              <Button.Group>
-                <Button
-                  data-testid="security-context-btn"
-                  icon={<LockOutlined />}
-                  size="small"
-                  type={securityContextToken ? 'primary' : 'default'}
-                  onClick={() => setIsModalOpen(true)}
-                >
-                  {securityContextToken ? 'Edit' : 'Add'} Security Context
-                </Button>
-
-                {livePreviewContext && !livePreviewContext.livePreviewDisabled && (
-                  <Button
-                    data-testid="live-preview-btn"
-                    icon={<CloudOutlined />}
-                    size="small"
-                    type={
-                      livePreviewContext.statusLivePreview.active
-                        ? 'primary'
-                        : 'default'
-                    }
-                    onClick={() =>
-                      livePreviewContext.statusLivePreview.active
-                        ? livePreviewContext.stopLivePreview()
-                        : livePreviewContext.startLivePreview()
-                    }
-                  >
-                    {livePreviewContext.statusLivePreview.active
-                      ? 'Stop'
-                      : 'Start'}{' '}
-                    Live Preview
-                  </Button>
-                )}
-              </Button.Group>
-
-              {livePreviewContext?.statusLivePreview.active && (
-                <LivePreviewBar />
-              )}
-            </Space>
-          }
-        >
-          {({ id, query, chartType }, saveTab) => (
-            <PlaygroundQueryBuilder
-              queryId={id}
+      <RollupDesignerContext apiUrl={apiUrl!}>
+        <ChartRendererStateProvider>
+          <StyledCard bordered={false}>
+            <QueryTabsRenderer
               apiUrl={apiUrl!}
-              cubejsToken={currentToken!}
-              initialVizState={{
-                query,
-                chartType
-              }}
-              dashboardSource={dashboardSource}
-              schemaVersion={props.schemaVersion}
-              onVizStateChanged={(vizState) => {
-                saveTab({
-                  query: vizState.query || {},
-                  chartType: vizState.chartType
-                });
-                props.onVizStateChanged?.(vizState);
-              }}
+              token={currentToken!}
+              dashboardSource={props.dashboardSource}
+              securityContextToken={securityContextToken}
+              onTabChange={props.onTabChange}
+              onSecurityContextModalOpen={() => setIsModalOpen(true)}
             />
-          )}
-        </QueryTabs>
-      </StyledCard>
+          </StyledCard>
+        </ChartRendererStateProvider>
+      </RollupDesignerContext>
     </CubeProvider>
+  );
+}
+
+type QueryTabsRendererProps = {
+  apiUrl: string;
+  token: string;
+  securityContextToken: string | null;
+  onSecurityContextModalOpen: () => void;
+} & Pick<
+  PlaygroundQueryBuilderProps,
+  'schemaVersion' | 'dashboardSource' | 'onVizStateChanged' | 'onSchemaChange'
+> &
+  Pick<QueryTabsProps, 'onTabChange'>;
+
+function QueryTabsRenderer({
+  apiUrl,
+  token,
+  securityContextToken,
+  dashboardSource,
+  schemaVersion,
+  onSecurityContextModalOpen,
+  ...props
+}: QueryTabsRendererProps) {
+  const { location } = useHistory();
+  const { setQuery, toggleModal } = useRollupDesignerContext();
+
+  const params = new URLSearchParams(location.search);
+  const query = JSON.parse(params.get('query') || 'null');
+
+  return (
+    <QueryTabs
+      query={query}
+      sidebar={
+        <Space direction="horizontal">
+          <Button
+            data-testid="security-context-btn"
+            icon={<LockOutlined />}
+            size="small"
+            type={securityContextToken ? 'primary' : 'default'}
+            onClick={onSecurityContextModalOpen}
+          >
+            {securityContextToken ? 'Edit' : 'Add'} Security Context
+          </Button>
+
+          <Button
+            data-testid="rd-btn"
+            icon={<ThunderboltOutlined />}
+            size="small"
+            onClick={() => toggleModal()}
+          >
+            Add Rollup to Schema
+          </Button>
+        </Space>
+      }
+      onTabChange={(tab) => {
+        props.onTabChange?.(tab);
+        setQuery(tab.query);
+      }}
+    >
+      {({ id, query, chartType }, saveTab) => (
+        <PlaygroundQueryBuilder
+          queryId={id}
+          apiUrl={apiUrl}
+          cubejsToken={token}
+          initialVizState={{
+            query,
+            chartType,
+          }}
+          dashboardSource={dashboardSource}
+          schemaVersion={schemaVersion}
+          onVizStateChanged={(vizState) => {
+            saveTab({
+              query: vizState.query || {},
+              chartType: vizState.chartType,
+            });
+            props.onVizStateChanged?.(vizState);
+
+            if (vizState.query) {
+              setQuery(vizState.query);
+            }
+          }}
+        />
+      )}
+    </QueryTabs>
   );
 }

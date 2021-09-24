@@ -1,4 +1,4 @@
-import uuid from 'uuid/v4';
+import { v4 as uuidv4 } from 'uuid';
 
 import { UserError } from './UserError';
 import type { ApiGateway } from './gateway';
@@ -11,7 +11,8 @@ const methodParams: Record<string, string[]> = {
   'dry-run': ['query'],
   meta: [],
   subscribe: ['query', 'queryType'],
-  unsubscribe: []
+  unsubscribe: [],
+  'subscribe.queue.events': []
 };
 
 export type WebSocketSendMessageFn = (connectionId: string, message: any) => void;
@@ -77,7 +78,7 @@ export class SubscriptionServer {
       }
 
       const baseRequestId = message.requestId || `${connectionId}-${message.messageId}`;
-      const requestId = `${baseRequestId}-span-${uuid()}`;
+      const requestId = `${baseRequestId}-span-${uuidv4()}`;
       context = await this.apiGateway.contextByReq(message, authContext.securityContext, requestId);
 
       const allowedParams = methodParams[message.method];
@@ -87,7 +88,9 @@ export class SubscriptionServer {
       const method = message.method.replace(/[^a-z]+(.)/g, (m, chr) => chr.toUpperCase());
       await this.apiGateway[method]({
         ...params,
+        connectionId,
         context,
+        signedWithPlaygroundAuthSecret: authContext.signedWithPlaygroundAuthSecret,
         isSubscription,
         res: this.resultFn(connectionId, message.messageId),
         subscriptionState: async () => {
@@ -120,6 +123,8 @@ export class SubscriptionServer {
   }
 
   public async disconnect(connectionId: string) {
+    const authContext = await this.subscriptionStore.getAuthContext(connectionId);
+    await this.apiGateway.unSubscribeQueueEvents({ context: authContext, connectionId });
     await this.subscriptionStore.cleanupSubscriptions(connectionId);
   }
 

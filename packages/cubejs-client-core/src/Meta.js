@@ -65,12 +65,18 @@ class Meta {
     return this.cubes.reduce(
       (memo, cube) => {
         memberKeys.forEach((key) => {
+          let members = cube[key];
+
+          if (key === 'timeDimensions') {
+            members = cube.dimensions.filter((m) => m.type === 'time');
+          }
+
           memo[key] = [
             ...memo[key],
             {
               cubeName: cube.name,
               cubeTitle: cube.title,
-              members: key === 'timeDimensions' ? cube.dimensions.filter((m) => m.type === 'time') : cube[key],
+              members
             },
           ];
         });

@@ -350,6 +350,17 @@ span.group-header {
   padding-bottom: 4px;
 }
 
+.menuWrapperHack {
+
+  margin-top: -40px;
+  padding-top: 56px !important;
+
+  @media screen and (max-width: 767px) {
+    margin-top: -118px;
+    padding-top: 118px !important;
+  }
+}
+
 .menuWrapper {
   height: 100%;
   width: inherit;
@@ -472,11 +483,12 @@ span.group-header {
           color: $dark-01;
 
           .ant-menu-item {
+            padding: 0.25rem 0;
             margin-left: 20px;
             font-size: 15px;
-            line-height: 25px;
-            height: 29px;
-            min-height: 20px;
+            line-height: 1.5rem;
+            min-height: 1.25rem;
+            height: auto;
 
             &:first-child {
               margin-top: 6px !important;
@@ -921,6 +933,7 @@ section[type=h2] h2 {
 
   :global {
     .ant-radio-button-wrapper {
+      border-radius: none;
       color: $pink-hover;
       border: 1px solid $pink-04;
       outline: none;
@@ -932,6 +945,10 @@ section[type=h2] h2 {
       &:focus-within {
         outline: none !important;
       }
+    }
+
+    .ant-radio-button-wrapper:first-child:last-child {
+      border-radius: 0;
     }
 
     .ant-radio-button-wrapper-checked {
@@ -973,7 +990,11 @@ section[type=h2] h2 {
         border-bottom: none;
       }
 
-      &.gettingStartedItemAdjacent {
+      &.originalWidth {
+        width: calc(100% / 3);
+      }
+
+      &:nth-child(even) {
         @include card-grid-item-adjacent;
       }
 
@@ -1021,6 +1042,51 @@ section[type=h2] h2 {
         }
 
         .gettingStartedItemText {
+          @include card-grid-item-text;
+        }
+      }
+    }
+  }
+
+  .connectingToDatabaseGrid {
+    @include card-grid;
+
+    > .ant-row {
+      display: flex;
+      flex-flow: row wrap;
+    }
+
+    .connectingToDatabaseItem {
+      @include card-grid-item-without-width;
+
+      a {
+        border-bottom: none;
+      }
+
+      .connectingToDatabaseItemContent {
+        @include card-grid-item-content;
+        margin: 1.5rem;
+
+        .connectingToDatabaseItemImage {
+          @include card-grid-item-image;
+          position: unset;
+          display: flex;
+          justify-content: center;
+
+          > img {
+            box-shadow: none !important;
+            border: none;
+            max-height: 160px;
+          }
+        }
+
+        .connectingToDatabaseItemLink {
+          @include card-grid-item-link;
+          margin-top: 0.5rem;
+          text-align: center;
+        }
+
+        .connectingToDatabaseItemText {
           @include card-grid-item-text;
         }
       }

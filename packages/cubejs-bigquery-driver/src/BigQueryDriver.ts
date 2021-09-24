@@ -11,8 +11,6 @@ import { Table } from '@google-cloud/bigquery/build/src/table';
 import { Query } from '@google-cloud/bigquery/build/src/bigquery';
 import { HydrationStream } from './HydrationStream';
 
-const suffixTableRegex = /^(.*?)([0-9_]+)$/;
-
 interface BigQueryDriverOptions extends BigQueryOptions {
   readOnly?: boolean
   projectId?: string,
@@ -30,9 +28,9 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
 
   protected readonly bigquery: BigQuery;
 
-  protected readonly storage: Storage|null = null;
+  protected readonly storage: Storage | null = null;
 
-  protected readonly bucket: Bucket|null = null;
+  protected readonly bucket: Bucket | null = null;
 
   public constructor(config: BigQueryDriverOptions = {}) {
     super();
@@ -60,13 +58,6 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       this.storage = new Storage(this.options);
       this.bucket = this.storage.bucket(this.options.exportBucket);
     }
-
-    this.mapFieldsRecursive = this.mapFieldsRecursive.bind(this);
-    this.tablesSchema = this.tablesSchema.bind(this);
-    this.parseDataset = this.parseDataset.bind(this);
-    this.parseTableData = this.parseTableData.bind(this);
-    this.flatten = this.flatten.bind(this);
-    this.toObjectFromId = this.toObjectFromId.bind(this);
   }
 
   public static driverEnvVariables() {
@@ -98,70 +89,42 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     );
   }
 
-  protected toObjectFromId(accumulator: any, currentElement: any) {
-    accumulator[currentElement.id] = currentElement.data;
-    return accumulator;
-  }
+  protected async loadTablesForDataset(dataset: Dataset) {
+    try {
+      const result = await dataset.query({
+        query: `
+        SELECT
+          columns.column_name as ${this.quoteIdentifier('column_name')},
+          columns.table_name as ${this.quoteIdentifier('table_name')},
+          columns.table_schema as ${this.quoteIdentifier('table_schema')},
+          columns.data_type as ${this.quoteIdentifier('data_type')}
+        FROM INFORMATION_SCHEMA.COLUMNS
+      `
+      });
 
-  protected reduceSuffixTables(accumulator: any, currentElement: any) {
-    const suffixMatch = currentElement.id.toString().match(suffixTableRegex);
-    if (suffixMatch) {
-      accumulator.__suffixMatched = accumulator.__suffixMatched || {};
-      accumulator.__suffixMatched[suffixMatch[1]] = accumulator.__suffixMatched[suffixMatch[1]] || [];
-      accumulator.__suffixMatched[suffixMatch[1]].push(currentElement);
-    } else {
-      accumulator[currentElement.id] = currentElement.data;
-    }
-    return accumulator;
-  }
-
-  protected addSuffixTables(accumulator: any) {
-    // eslint-disable-next-line no-restricted-syntax,guard-for-in
-    for (const prefix in accumulator.__suffixMatched) {
-      const suffixMatched = accumulator.__suffixMatched[prefix];
-      const sorted = suffixMatched.sort((a: any, b: any) => b.toString().localeCompare(a.toString()));
-      for (let i = 0; i < Math.min(10, sorted.length); i++) {
-        accumulator[sorted[i].id] = sorted[i].data;
+      if (result.length) {
+        return R.reduce(
+          this.informationColumnsSchemaReducer, {}, result[0]
+        );
       }
+
+      return [];
+    } catch (e) {
+      if (e.message.includes('Permission bigquery.tables.get denied on table')) {
+        return {};
+      }
+
+      throw e;
     }
-    delete accumulator.__suffixMatched;
-    return accumulator;
   }
 
-  protected flatten(list: any) {
-    return list.reduce(
-      (a: any, b: any) => a.concat(Array.isArray(b) ? this.flatten(b) : b), []
+  public async tablesSchema() {
+    const dataSets = await this.bigquery.getDatasets();
+    const dataSetsColumns = await Promise.all(
+      dataSets[0].map((dataSet) => this.loadTablesForDataset(dataSet))
     );
-  }
 
-  protected mapFieldsRecursive(field: any) {
-    if (field.type === 'RECORD') {
-      return this.flatten(field.fields.map(this.mapFieldsRecursive)).map(
-        (nestedField: any) => ({ name: `${field.name}.${nestedField.name}`, type: nestedField.type })
-      );
-    }
-    return field;
-  }
-
-  protected parseDataset(dataset: Dataset) {
-    return dataset.getTables().then(
-      (data) => Promise.all(data[0].map(this.parseTableData))
-        .then(tables => ({ id: dataset.id, data: this.addSuffixTables(tables.reduce(this.reduceSuffixTables, {})) }))
-    );
-  }
-
-  protected parseTableData(table: Table) {
-    return table.getMetadata().then(
-      (data) => ({
-        id: table.id,
-        data: this.flatten(((data[0].schema && data[0].schema.fields) || []).map(this.mapFieldsRecursive))
-      })
-    );
-  }
-
-  public tablesSchema() {
-    return this.bigquery.getDatasets().then((data) => Promise.all(data[0].map(this.parseDataset))
-      .then(innerData => innerData.reduce(this.toObjectFromId, {})));
+    return dataSetsColumns.reduce((prev, current) => Object.assign(prev, current), {});
   }
 
   public async getTablesQuery(schemaName: string) {

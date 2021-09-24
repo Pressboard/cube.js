@@ -3,6 +3,49 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.10](https://github.com/cube-js/cube.js/compare/v0.28.9...v0.28.10) (2021-07-30)
+
+**Note:** Version bump only for package @cubejs-client/ngx
+
+
+
+
+
+## [0.28.6](https://github.com/cube-js/cube.js/compare/v0.28.5...v0.28.6) (2021-07-22)
+
+
+### Bug Fixes
+
+* **@cubejs-client/playground:** week granularity ([#3146](https://github.com/cube-js/cube.js/issues/3146)) ([9697a64](https://github.com/cube-js/cube.js/commit/9697a646e5e58edc54c4b08a810e0faecc4d0c69))
+
+
+### Features
+
+* **@cubejs-client/ngx:** async CubejsClient initialization ([#2876](https://github.com/cube-js/cube.js/issues/2876)) ([bba3a01](https://github.com/cube-js/cube.js/commit/bba3a01d2a072093509633f2d26e8df9677f940c))
+
+
+
+
+
+# [0.28.0](https://github.com/cube-js/cube.js/compare/v0.27.53...v0.28.0) (2021-07-17)
+
+**Note:** Version bump only for package @cubejs-client/ngx
+
+
+
+
+
+## [0.27.51](https://github.com/cube-js/cube.js/compare/v0.27.50...v0.27.51) (2021-07-13)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** incorrect types for logical and/or in query filters ([#3083](https://github.com/cube-js/cube.js/issues/3083)) ([d7014a2](https://github.com/cube-js/cube.js/commit/d7014a21add8d264d92987a3c840d98d09545457))
+
+
+
+
+
 ## [0.27.25](https://github.com/cube-js/cube.js/compare/v0.27.24...v0.27.25) (2021-06-01)
 
 

@@ -31,7 +31,7 @@ folder. To start the app you either navigate to the "Dashboard App" tab in the
 playground and click "Start dashboard app" or run `$ npm run start` in
 `your-project-folder/dashboard-app` folder. Dashboard App runs on `3000` port.
 You can access it directly by going to
-[http://localhost:3050](http://localhost:3050) or inside the playground under
+[http://localhost:3000](http://localhost:3000) or inside the Playground under
 the "Dashboard App" tab.
 
 Dashboard App uses Cube.js backend to power the query builder and the dashboard.
@@ -55,7 +55,7 @@ can refer to the
 [create-react-app deployment](https://create-react-app.dev/docs/deployment)
 guide for additional deployment options.
 
-### Netlify
+### <--{"id" : "Deployment"}-->  Netlify
 
 Install Netlify CLI:
 
@@ -74,7 +74,7 @@ $ netlify deploy
 Next follow command line prompts and choose yes for new project and `build` as
 your deploy folder.
 
-### ZEIT
+### <--{"id" : "Deployment"}-->  ZEIT
 
 Install ZEIT Now CLI:
 

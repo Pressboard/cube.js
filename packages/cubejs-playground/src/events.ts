@@ -1,6 +1,5 @@
-import { fetch } from 'whatwg-fetch';
 import cookie from 'js-cookie';
-import uuidv4 from 'uuid/v4';
+import { v4 as uuidv4 } from 'uuid';
 
 let flushPromise = null;
 let trackEvents: BaseEvent[] = [];
@@ -8,7 +7,9 @@ let baseProps = {
   sentFrom: 'frontend',
 };
 let telemetry: boolean | undefined;
-let track: null | ((event: Record<string, any>, telemetry?: boolean) => Promise<any>) = null;
+let track:
+  | null
+  | ((event: Record<string, any>, telemetry?: boolean) => Promise<any>) = null;
 
 export const setTelemetry = (isAllowed) => (telemetry = isAllowed);
 

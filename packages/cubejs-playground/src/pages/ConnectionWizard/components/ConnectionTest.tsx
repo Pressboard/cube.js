@@ -18,7 +18,7 @@ export default function ConnectionTest({
   if (loading) {
     return (
       <Space align="center" size="middle">
-        <Spin data-testid="wizard-test-connection-spinner"/>
+        <Spin data-testid="wizard-test-connection-spinner" />
         <Typography.Text>Testing database connection</Typography.Text>
       </Space>
     );
@@ -64,10 +64,10 @@ export default function ConnectionTest({
               </p>
               {/* eslint-disable-next-line */}
               <a
-                href="https://cube.dev/docs/connecting-to-the-database"
+                href="https://cube.dev/docs/config/databases"
                 target="_blank"
               >
-                https://cube.dev/docs/connecting-to-the-database
+                https://cube.dev/docs/config/databases
               </a>
             </>
           ))()}

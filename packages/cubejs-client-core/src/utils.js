@@ -10,6 +10,7 @@ export const GRANULARITIES = [
   { name: 'day', title: 'Day' },
   { name: 'week', title: 'Week' },
   { name: 'month', title: 'Month' },
+  { name: 'quarter', title: 'Quarter' },
   { name: 'year', title: 'Year' },
 ];
 
@@ -284,4 +285,16 @@ export function getOrderMembersFromOrder(orderMembers, order) {
   });
 
   return nextOrderMembers;
+}
+
+export function aliasSeries(values, index, pivotConfig, duplicateMeasures) {
+  const nonNullValues = values.filter((value) => value != null);
+
+  if (pivotConfig && pivotConfig.aliasSeries && pivotConfig.aliasSeries[index]) {
+    return [pivotConfig.aliasSeries[index], ...nonNullValues];
+  } else if (duplicateMeasures.has(nonNullValues[0])) {
+    return [index, ...nonNullValues];
+  }
+
+  return nonNullValues;
 }

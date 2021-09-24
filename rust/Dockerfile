@@ -6,8 +6,8 @@ FROM rust:1.47-buster as builder
 # /build/arrow/rust/arrow/src/lib.rs:127:1
 # #![feature(specialization)]
 RUN rustup update && \
-    rustup default nightly-2021-02-17 && \
-    rustup component add --toolchain nightly-2021-02-17 rustfmt
+    rustup default nightly-2021-07-04 && \
+    rustup component add --toolchain nightly-2021-07-04 rustfmt
 
 RUN apt update && apt upgrade -y && apt install -y git llvm-dev libclang-dev clang
 
@@ -23,10 +23,14 @@ COPY cubestore-sql-tests cubestore-sql-tests
 COPY cubestore/Cargo.toml cubestore/Cargo.toml
 RUN mkdir -p cubestore/src/bin && \
     echo "fn main() {print!(\"Dummy main\");} // dummy file" > cubestore/src/bin/cubestored.rs
-RUN RUSTFLAGS="-C target-feature=+avx2" cargo build --release -p cubestore
+
+ARG WITH_AVX2=1
+RUN [ "$WITH_AVX2" -eq "1" ] && export RUSTFLAGS="-C target-feature=+avx2"; \
+	 cargo build --release -p cubestore
 
 COPY cubestore cubestore
-RUN RUSTFLAGS="-C target-feature=+avx2" cargo build --release -p cubestore
+RUN [ "$WITH_AVX2" -eq "1" ] && export RUSTFLAGS="-C target-feature=+avx2"; \
+	cargo build --release -p cubestore
 
 FROM debian:buster-slim
 

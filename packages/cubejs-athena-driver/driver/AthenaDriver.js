@@ -1,12 +1,7 @@
-const AWS = require('aws-sdk');
-const { promisify } = require('util');
+const AWS = require('@aws-sdk/client-athena');
 const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
-const { getEnv } = require('@cubejs-backend/shared');
+const { getEnv, pausePromise } = require('@cubejs-backend/shared');
 const SqlString = require('sqlstring');
-
-function pause(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
 
 const applyParams = (query, params) => SqlString.format(query, params);
 
@@ -15,20 +10,19 @@ class AthenaDriver extends BaseDriver {
     super();
 
     this.config = {
-      accessKeyId: process.env.CUBEJS_AWS_KEY,
-      secretAccessKey: process.env.CUBEJS_AWS_SECRET,
+      credentials: {
+        accessKeyId: config.accessKeyId || process.env.CUBEJS_AWS_KEY,
+        secretAccessKey: config.secretAccessKey || process.env.CUBEJS_AWS_SECRET,
+      },
       region: process.env.CUBEJS_AWS_REGION,
       S3OutputLocation: process.env.CUBEJS_AWS_S3_OUTPUT_LOCATION,
+      workGroup: process.env.CUBEJS_AWS_ATHENA_WORKGROUP || 'primary',
       ...config,
       pollTimeout: (config.pollTimeout || getEnv('dbPollTimeout')) * 1000,
       pollMaxInterval: (config.pollMaxInterval || getEnv('dbPollMaxInterval')) * 1000,
     };
 
     this.athena = new AWS.Athena(this.config);
-    this.athena.startQueryExecutionAsync = promisify(this.athena.startQueryExecution.bind(this.athena));
-    this.athena.stopQueryExecutionAsync = promisify(this.athena.stopQueryExecution.bind(this.athena));
-    this.athena.getQueryResultsAsync = promisify(this.athena.getQueryResults.bind(this.athena));
-    this.athena.getQueryExecutionAsync = promisify(this.athena.getQueryExecution.bind(this.athena));
   }
 
   readOnly() {
@@ -36,11 +30,13 @@ class AthenaDriver extends BaseDriver {
   }
 
   async testConnection() {
-    return this.query('SELECT 1', []);
+    await this.athena.getWorkGroup({
+      WorkGroup: this.config.workGroup
+    });
   }
 
   async awaitForJobStatus(QueryExecutionId, query, options) {
-    const queryExecution = await this.athena.getQueryExecutionAsync({
+    const queryExecution = await this.athena.getQueryExecution({
       QueryExecutionId
     });
 
@@ -64,9 +60,9 @@ class AthenaDriver extends BaseDriver {
       }, options);
 
       for (
-        let results = await this.athena.getQueryResultsAsync({ QueryExecutionId });
+        let results = await this.athena.getQueryResults({ QueryExecutionId });
         results;
-        results = results.NextToken && (await this.athena.getQueryResultsAsync({
+        results = results.NextToken && (await this.athena.getQueryResults({
           QueryExecutionId, NextToken: results.NextToken
         }))
       ) {
@@ -95,8 +91,9 @@ class AthenaDriver extends BaseDriver {
       } : s))
     );
 
-    const { QueryExecutionId } = await this.athena.startQueryExecutionAsync({
+    const { QueryExecutionId } = await this.athena.startQueryExecution({
       QueryString: queryString,
+      WorkGroup: this.config.workGroup,
       ResultConfiguration: {
         OutputLocation: this.config.S3OutputLocation
       }
@@ -110,7 +107,7 @@ class AthenaDriver extends BaseDriver {
         return result;
       }
 
-      await pause(
+      await pausePromise(
         Math.min(this.config.pollMaxInterval, 500 * i)
       );
     }

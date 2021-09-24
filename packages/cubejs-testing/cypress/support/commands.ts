@@ -31,7 +31,7 @@ Cypress.Commands.add('getByTestId', (selector, ...args) => {
 });
 
 Cypress.Commands.add('setQuery', (query, ...args) => {
-  cy.clearLocalStorage('queryTabs');
+  cy.clearLocalStorage(/queryTabs/);
   cy.visit(`/#/build?query=${JSON.stringify(query)}`, ...args);
   cy.wait(100);
 });
@@ -54,11 +54,13 @@ Cypress.Commands.add('runQuery', () => {
 });
 
 Cypress.Commands.add('addMeasure', (name) => {
-  cy.getByTestId('Measure').click();
-  cy.getByTestId(name).click();
+  cy.getByTestId('Measure', { timeout: 5 * 1000 }).click();
+  // Click bottom as top can be overflowed by the Search input
+  cy.getByTestId(name).click('bottom');
 });
 
 Cypress.Commands.add('addDimension', (name) => {
-  cy.getByTestId('Dimension').click();
-  cy.getByTestId(name).click();
+  cy.getByTestId('Dimension', { timeout: 5 * 1000 }).click();
+  // Click bottom as top can be overflowed by the Search input
+  cy.getByTestId(name).click('bottom');
 });

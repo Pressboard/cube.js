@@ -55,6 +55,9 @@ pub mod table;
 pub mod telemetry;
 pub mod util;
 
+pub use datafusion::cube_ext::spawn;
+pub use datafusion::cube_ext::spawn_blocking;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CubeError {
     pub message: String,
@@ -71,7 +74,7 @@ pub enum CubeErrorCauseType {
 }
 
 impl CubeError {
-    fn display_with_backtrace(&'a self) -> impl Display + 'a {
+    pub fn display_with_backtrace(&'a self) -> impl Display + 'a {
         struct WithBt<'a>(&'a CubeError);
         impl Display for WithBt<'_> {
             fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -110,7 +113,7 @@ impl CubeError {
         }
     }
 
-    fn from_debug_error<E: Debug>(error: E) -> CubeError {
+    pub fn from_debug_error<E: Debug>(error: E) -> CubeError {
         CubeError {
             message: format!("{:?}", error),
             backtrace: Backtrace::capture().to_string(),
@@ -127,13 +130,13 @@ impl fmt::Display for CubeError {
 
 impl From<flexbuffers::DeserializationError> for CubeError {
     fn from(v: DeserializationError) -> Self {
-        CubeError::internal(v.to_string())
+        CubeError::from_error(v.to_string())
     }
 }
 
 impl From<rocksdb::Error> for CubeError {
     fn from(v: rocksdb::Error) -> Self {
-        CubeError::internal(v.into_string())
+        CubeError::from_error(v.into_string())
     }
 }
 
@@ -145,19 +148,19 @@ impl From<std::io::Error> for CubeError {
 
 impl From<ParserError> for CubeError {
     fn from(v: ParserError) -> Self {
-        CubeError::internal(format!("{:?}", v))
+        CubeError::from_error(format!("{:?}", v))
     }
 }
 
 impl From<ParquetError> for CubeError {
     fn from(v: ParquetError) -> Self {
-        CubeError::internal(v.to_string())
+        CubeError::from_error(v.to_string())
     }
 }
 
 impl From<tokio::task::JoinError> for CubeError {
     fn from(v: tokio::task::JoinError) -> Self {
-        CubeError::internal(v.to_string())
+        CubeError::from_error(v.to_string())
     }
 }
 
@@ -178,13 +181,13 @@ impl From<broadcast::error::SendError<RemoteFsOpResult>> for CubeError {
 
 impl From<std::time::SystemTimeError> for CubeError {
     fn from(v: std::time::SystemTimeError) -> Self {
-        CubeError::internal(v.to_string())
+        CubeError::from_error(v)
     }
 }
 
 impl From<Elapsed> for CubeError {
     fn from(v: Elapsed) -> Self {
-        CubeError::internal(v.to_string())
+        CubeError::from_error(v)
     }
 }
 
@@ -202,7 +205,7 @@ impl From<CubeError> for datafusion::error::DataFusionError {
 
 impl From<arrow::error::ArrowError> for CubeError {
     fn from(v: ArrowError) -> Self {
-        CubeError::internal(v.to_string())
+        CubeError::from_error(v)
     }
 }
 
@@ -226,13 +229,13 @@ impl From<tokio::sync::broadcast::error::SendError<cluster::JobEvent>> for CubeE
 
 impl From<bigdecimal::ParseBigDecimalError> for CubeError {
     fn from(v: bigdecimal::ParseBigDecimalError) -> Self {
-        CubeError::internal(v.to_string())
+        CubeError::from_error(v)
     }
 }
 
 impl From<flexbuffers::SerializationError> for CubeError {
     fn from(v: flexbuffers::SerializationError) -> Self {
-        CubeError::internal(v.to_string())
+        CubeError::from_error(v)
     }
 }
 
@@ -261,20 +264,13 @@ impl From<awsregion::AwsRegionError> for CubeError {
 
 impl From<chrono::ParseError> for CubeError {
     fn from(v: chrono::ParseError) -> Self {
-        CubeError::internal(v.to_string())
+        CubeError::from_error(v)
     }
 }
 
 impl From<std::string::FromUtf8Error> for CubeError {
     fn from(v: std::string::FromUtf8Error) -> Self {
-        CubeError::internal(v.to_string())
-    }
-}
-
-#[cfg(not(target_os = "windows"))]
-impl From<procspawn::SpawnError> for CubeError {
-    fn from(v: procspawn::SpawnError) -> Self {
-        CubeError::internal(v.to_string())
+        CubeError::from_error(v)
     }
 }
 
@@ -408,6 +404,12 @@ impl From<tempfile::PathPersistError> for CubeError {
 
 impl From<tokio::sync::AcquireError> for CubeError {
     fn from(v: tokio::sync::AcquireError) -> Self {
+        return CubeError::from_error(v);
+    }
+}
+
+impl From<warp::Error> for CubeError {
+    fn from(v: warp::Error) -> Self {
         return CubeError::from_error(v);
     }
 }

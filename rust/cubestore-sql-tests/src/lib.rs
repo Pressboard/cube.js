@@ -16,6 +16,8 @@ use tests::sql_tests;
 
 #[cfg(not(target_os = "windows"))]
 pub mod multiproc;
+#[allow(unused_parens, non_snake_case)]
+mod rows;
 mod tests;
 
 #[async_trait]
@@ -39,6 +41,8 @@ pub fn run_sql_tests(
                     ignore: false,
                     should_panic: ShouldPanic::No,
                     allow_fail: false,
+                    compile_fail: false,
+                    no_run: false,
                     test_type: TestType::IntegrationTest,
                 },
                 testfn: DynTestFn(Box::new(move || runner(name, test_fn))),

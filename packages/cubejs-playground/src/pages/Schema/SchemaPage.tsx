@@ -6,7 +6,7 @@ import PrismCode from '../../PrismCode';
 import { playgroundAction } from '../../events';
 import { Menu, Tabs, Tree } from '../../components';
 import { Alert, CubeLoader } from '../../atoms';
-import fetch from '../../playground-fetch';
+import { playgroundFetch } from '../../shared/helpers';
 import { AppContextConsumer } from '../../components/AppContext';
 
 const { Content, Sider } = Layout;
@@ -71,7 +71,7 @@ export default class SchemaPage extends Component<SchemaPageProps, any> {
   async loadDBSchema() {
     this.setState({ schemaLoading: true });
     try {
-      const res = await fetch('/playground/db-schema');
+      const res = await playgroundFetch('/playground/db-schema');
       const result = await res.json();
       this.setState({
         tablesSchema: result.tablesSchema,
@@ -84,7 +84,7 @@ export default class SchemaPage extends Component<SchemaPageProps, any> {
   }
 
   async loadFiles() {
-    const res = await fetch('/playground/files');
+    const res = await playgroundFetch('/playground/files');
     const result = await res.json();
     this.setState({
       files: result.files,
@@ -95,7 +95,7 @@ export default class SchemaPage extends Component<SchemaPageProps, any> {
     const { checkedKeys, tablesSchema } = this.state;
     const { history } = this.props;
     playgroundAction('Generate Schema');
-    const res = await fetch('/playground/generate-schema', {
+    const res = await playgroundFetch('/playground/generate-schema', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -254,7 +254,7 @@ export default class SchemaPage extends Component<SchemaPageProps, any> {
                     Schema files are located and can be edited in the mount
                     volume directory.{' '}
                     <Typography.Link
-                      href="https://cube.dev/docs/getting-started-cubejs-schema"
+                      href="https://cube.dev/docs/schema/getting-started"
                       target="_blank"
                     >
                       Learn more about working with Cube.js data schema in the

@@ -1,9 +1,13 @@
-import { Tabs } from 'antd';
-import { ReactNode, useEffect } from 'react';
 import { ChartType, Query } from '@cubejs-client/core';
+import { Tabs } from 'antd';
+import equals from 'fast-deep-equal';
+import { ReactNode, useEffect, useState } from 'react';
 import styled from 'styled-components';
 
+import { event } from '../../events';
 import { useLocalStorage } from '../../hooks';
+import { QueryLoadResult } from '../ChartRenderer/ChartRenderer';
+import { useChartRendererStateMethods } from './ChartRendererStateProvider';
 
 const { TabPane } = Tabs;
 
@@ -30,39 +34,159 @@ type QueryTabs = {
   tabs: QueryTab[];
 };
 
-type QueryTabsProps = {
-  query: Query;
+export type QueryTabsProps = {
+  query: Query | null;
   children: (
     tab: QueryTab,
     saveTab: (tab: Omit<QueryTab, 'id'>) => void
   ) => ReactNode;
   sidebar?: ReactNode | null;
+  onTabChange?: (tab: QueryTab) => void;
 };
 
-export function QueryTabs({ query, children, sidebar = null }: QueryTabsProps) {
+export function QueryTabs({
+  query,
+  children,
+  sidebar = null,
+  onTabChange,
+}: QueryTabsProps) {
+  const {
+    setChartRendererReady,
+    setQueryStatus,
+    setQueryError,
+    setResultSetExists,
+    setQueryLoading,
+    setBuildInProgress,
+    setSlowQuery,
+    setSlowQueryFromCache,
+  } = useChartRendererStateMethods();
+
+  const [ready, setReady] = useState<boolean>(false);
   const [queryTabs, saveTabs] = useLocalStorage<QueryTabs>('queryTabs', {
     activeId: '1',
     tabs: [
       {
         id: '1',
-        query,
+        query: query || {},
       },
     ],
   });
 
-  // tmp transition to new format
   useEffect(() => {
-    if (!queryTabs.activeId && (queryTabs as any).length > 0) {
-      saveTabs({
-        activeId: queryTabs[0].id,
-        tabs: queryTabs as any
-      })
-    }
-  }, [queryTabs]);
+    window['__cubejsPlayground'] = {
+      ...window['__cubejsPlayground'],
+      forQuery(queryId: string) {
+        return {
+          onChartRendererReady() {
+            setChartRendererReady(queryId, true);
+          },
+          onQueryStart: () => {
+            setQueryLoading(queryId, true);
+          },
+          onQueryLoad: ({ resultSet, error }: QueryLoadResult) => {
+            let isAggregated;
 
-  if (!queryTabs.activeId) {
-    return null;
-  }
+            if (resultSet) {
+              const { loadResponse } = resultSet.serialize();
+              const {
+                external,
+                dbType,
+                extDbType,
+                usedPreAggregations = {},
+              } = loadResponse.results[0] || {};
+
+              setSlowQueryFromCache(queryId, Boolean(loadResponse.slowQuery));
+              Boolean(loadResponse.slowQuery) && setSlowQuery(queryId, false);
+              setResultSetExists(queryId, true);
+
+              isAggregated = Object.keys(usedPreAggregations).length > 0;
+
+              event(
+                isAggregated
+                  ? 'load_request_success_aggregated:frontend'
+                  : 'load_request_success:frontend',
+                {
+                  dbType,
+                  ...(isAggregated ? { external } : null),
+                  ...(external ? { extDbType } : null),
+                }
+              );
+
+              const response = resultSet.serialize();
+              const [result] = response.loadResponse.results;
+
+              const preAggregationType = Object.values(
+                result.usedPreAggregations || {}
+              )[0]?.type;
+              const transformedQuery = result.transformedQuery;
+
+              setQueryStatus(queryId, {
+                resultSet,
+                error,
+                isAggregated,
+                preAggregationType,
+                transformedQuery,
+                extDbType,
+                external,
+              });
+            }
+
+            if (error) {
+              setQueryStatus(queryId, null);
+              setQueryError(queryId, error);
+            }
+
+            if (resultSet || error) {
+              setQueryLoading(queryId, false);
+            }
+          },
+          onQueryProgress: (progress) => {
+            setBuildInProgress(
+              queryId,
+              Boolean(progress?.stage?.stage.includes('pre-aggregation'))
+            );
+
+            const isQuerySlow =
+              progress?.stage?.stage.includes('Executing query') &&
+              (progress.stage.timeElapsed || 0) >= 5000;
+
+            setSlowQuery(queryId, isQuerySlow);
+            isQuerySlow && setSlowQueryFromCache(queryId, false);
+          },
+        };
+      },
+    };
+  }, []);
+
+  useEffect(() => {
+    if (ready) {
+      return;
+    }
+
+    const currentTab = queryTabs.tabs.find(
+      (tab) => tab.id === queryTabs.activeId
+    );
+
+    if (query && !equals(currentTab?.query, query)) {
+      const id = getNextId();
+
+      saveTabs({
+        activeId: id,
+        tabs: [...queryTabs.tabs, { id, query }],
+      });
+    }
+
+    setReady(true);
+  }, [ready]);
+
+  useEffect(() => {
+    if (ready && queryTabs.activeId) {
+      const activeTab = queryTabs.tabs.find(
+        (tab) => tab.id === queryTabs.activeId
+      );
+      activeTab && onTabChange?.(activeTab);
+    }
+  }, [ready, queryTabs.activeId]);
 
   const { activeId, tabs } = queryTabs;
 
@@ -94,6 +218,10 @@ export function QueryTabs({ query, children, sidebar = null }: QueryTabsProps) {
 
   function setActiveId(activeId: string) {
     saveTabs({ activeId, tabs });
+  }
+
+  if (!ready || !queryTabs.activeId) {
+    return null;
   }
 
   return (

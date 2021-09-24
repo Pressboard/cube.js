@@ -1,4 +1,4 @@
-FROM node:12.22.1
+FROM node:12.22.1 AS base
 
 ARG IMAGE_VERSION=dev
 
@@ -28,6 +28,7 @@ COPY packages/cubejs-linter packages/cubejs-linter
 COPY rust/package.json rust/package.json
 COPY rust/bin rust/bin
 COPY packages/cubejs-backend-shared/package.json packages/cubejs-backend-shared/package.json
+COPY packages/cubejs-testing/package.json packages/cubejs-testing/package.json
 COPY packages/cubejs-backend-cloud/package.json packages/cubejs-backend-cloud/package.json
 COPY packages/cubejs-api-gateway/package.json packages/cubejs-api-gateway/package.json
 COPY packages/cubejs-athena-driver/package.json packages/cubejs-athena-driver/package.json
@@ -67,11 +68,18 @@ RUN yarn policies set-version v1.22.5
 # There is a problem with release process.
 # We are doing version bump without updating lock files for the docker package.
 #RUN yarn install --frozen-lockfile
+FROM base as prod_dependencies
+RUN npm install -g lerna patch-package
+RUN yarn install --prod
+
+FROM base as build
+
 RUN yarn install
 
 # Backend
 COPY rust/ rust/
 COPY packages/cubejs-backend-shared/ packages/cubejs-backend-shared/
+COPY packages/cubejs-testing/ packages/cubejs-testing/
 COPY packages/cubejs-backend-cloud/ packages/cubejs-backend-cloud/
 COPY packages/cubejs-api-gateway/ packages/cubejs-api-gateway/
 COPY packages/cubejs-athena-driver/ packages/cubejs-athena-driver/
@@ -108,6 +116,13 @@ COPY packages/cubejs-playground/ packages/cubejs-playground/
 
 RUN yarn build
 RUN yarn lerna run build
+
+RUN find . -name 'node_modules' -type d -prune -exec rm -rf '{}' +
+
+FROM base AS final
+
+COPY --from=build /cubejs .
+COPY --from=prod_dependencies /cubejs .
 
 COPY packages/cubejs-docker/bin/cubejs-dev /usr/local/bin/cubejs
 

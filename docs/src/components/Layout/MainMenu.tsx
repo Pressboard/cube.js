@@ -1,10 +1,11 @@
 import React from 'react';
 
 import { Col, Menu } from 'antd';
+import cx from 'classnames';
 import omit from 'lodash/omit';
 
 import MenuItem from '../templates/MenuItem';
-import styles from '../../../static/styles/index.module.scss';
+import * as styles from '../../../static/styles/index.module.scss';
 import { useFrameworkOfChoice } from '../../stores/frameworkOfChoice';
 import {
   Frontmatter,
@@ -25,13 +26,13 @@ const menuOrderCloud = [
 ];
 
 const menuOrder = [
-  'Getting Started',
   'Cube.js Introduction',
+  'Getting Started',
   'Configuration',
+  'Data Schema',
   'Caching',
   'Authentication & Authorization',
   'Cube.js Backend',
-  'Data Schema',
   'Cube.js Frontend',
   'Deployment',
   'Developer Tools',
@@ -88,7 +89,7 @@ const MainMenu: React.FC<Props> = (props = defaultProps) => {
       {...layout.leftSidebar.width}
       xs={props.mobileMode === 'menu' ? 24 : 0}
     >
-      <div className={styles.menuWrapper}>
+      <div className={cx(styles.menuWrapper, styles.menuWrapperHack)}>
         <Menu {...menuProps} className={styles.antMenu}>
           <MenuItem to={isCloudDocs ? '/cloud' : '/'} title="Home" />
           {menuOrderResolved.map((item) => {

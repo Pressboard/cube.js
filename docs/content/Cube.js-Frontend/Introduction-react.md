@@ -16,11 +16,11 @@ The client has methods to communicate with Cube.js API Gateway, retrieve, and pr
 
 The client provides methods to solve common tasks:
 
-**Abstract from the transport and query data.** You can [fetch data](https://cube.dev/docs/@cubejs-client-core#cubejs-api-load)  from Cube.js Backend or subscribe to [real-time updates](https://cube.dev/docs/real-time-data-fetch) regardless of the protocol, be it HTTP or WebSockets.
+**Abstract from the transport and query data.** You can [fetch data](https://cube.dev/docs/@cubejs-client-core#load) from Cube.js Backend or subscribe to [real-time updates](https://cube.dev/docs/real-time-data-fetch) regardless of the protocol, be it HTTP or WebSockets.
 
-**Transform data for visualization.** You can [pivot](https://cube.dev/docs/@cubejs-client-core#result-set-pivot) the result set to display as a [chart](https://cube.dev/docs/@cubejs-client-core#result-set-chart-pivot) or as a [table](https://cube.dev/docs/@cubejs-client-core#result-set-table-pivot), split into [series](https://cube.dev/docs/@cubejs-client-core#result-set-series) or [table columns](https://cube.dev/docs/@cubejs-client-core#result-set-table-columns).
+**Transform data for visualization.** You can [pivot](https://cube.dev/docs/@cubejs-client-core#pivot) the result set to display as a [chart](https://cube.dev/docs/@cubejs-client-core#chart-pivot) or as a [table](https://cube.dev/docs/@cubejs-client-core#table-pivot), split into [series](https://cube.dev/docs/@cubejs-client-core#series) or [table columns](https://cube.dev/docs/@cubejs-client-core#table-columns).
 
-**Simplify work with complex query types.** You can build [Drill Down](https://cube.dev/docs/@cubejs-client-core#result-set-drill-down) queries and [decompose](https://cube.dev/docs/@cubejs-client-core#result-set-decompose) the results of [compareDateRange](https://cube.dev/docs/query-format#time-dimensions-format) or [Data Blending](https://cube.dev/docs/data-blending) queries.
+**Simplify work with complex query types.** You can build [Drill Down](https://cube.dev/docs/@cubejs-client-core#drill-down) queries and [decompose](https://cube.dev/docs/@cubejs-client-core#decompose) the results of [compareDateRange](https://cube.dev/docs/query-format#time-dimensions-format) or [Data Blending](https://cube.dev/docs/recipes/data-blending) queries.
 
 [Learn more](https://cube.dev/docs/@cubejs-client-core) in the documentation for the `@cubejs-client/core` package.
 
@@ -30,14 +30,14 @@ The package provides convenient tools to work with Cube.js in React:
 
 **Hooks.** You can add the [useCubeQuery hook](https://cube.dev/docs/@cubejs-client-react#use-cube-query) to functional React components to execute Cube.js queries.
 
-**Components.** You can use [QueryBuilder](https://cube.dev/docs/@cubejs-client-react#query-builder) and [QueryRenderer](https://cube.dev/docs/@cubejs-client-react#query-renderer) components to separate state management and API calls from your rendering code. You can also use [CubeProvider](https://cube.dev/docs/@cubejs-client-react#cube-provider) and [CubeContext](https://cube.dev/docs/@cubejs-client-react#cube-context) components for direct access to Cube.js Client anywhere in your application. 
+**Components.** You can use [QueryBuilder](https://cube.dev/docs/@cubejs-client-react#query-builder) and [QueryRenderer](https://cube.dev/docs/@cubejs-client-react#query-renderer) components to separate state management and API calls from your rendering code. You can also use [CubeProvider](https://cube.dev/docs/@cubejs-client-react#cube-provider) and [CubeContext](https://cube.dev/docs/@cubejs-client-react#cube-context) components for direct access to Cube.js Client anywhere in your application.
 
 ## Example Usage
 
 Here are the typical steps to query and visualize analytical data in React:
 
 - **Import `@cubejs-client/core` and `@cubejs-client/react` packages.** These packages provide all the necessary methods and convenient React tools.
-- **Create an instance of Cube.js JavaScript Client.** The client is initialized with Cube.js API URL. In development mode, the default URL is [http://localhost:4000/cubejs-api/v1](http://localhost:4000/cubejs-api/v1). The client is also initialized with an [API token](https://cube.dev/docs/security), but it takes effect only in [production](https://cube.dev/docs/deployment#production-mode).
+- **Create an instance of Cube.js JavaScript Client.** The client is initialized with Cube.js API URL. In development mode, the default URL is [http://localhost:4000/cubejs-api/v1](http://localhost:4000/cubejs-api/v1). The client is also initialized with an [API token](https://cube.dev/docs/security), but it takes effect only in [production](https://cube.dev/docs/deployment/production-checklist).
 - **Query data from Cube.js Backend.** In functional React components, use the `useCubeQuery` hook to execute a query, which is a plain JavaScript object. See [Query Format](https://cube.dev/docs/query-format) for details.
 - **Transform data for visualization.** The result set has convenient methods, such as `series` and `chartPivot`, to prepare data for charting.
 - **Visualize the data.** Use tools of your choice to draw charts and create visualizations.

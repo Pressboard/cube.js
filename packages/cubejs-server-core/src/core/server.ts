@@ -16,13 +16,13 @@ import {
 } from '@cubejs-backend/shared';
 
 import type { Application as ExpressApplication } from 'express';
-import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
+import type { BaseDriver, DriverFactoryByDataSource } from '@cubejs-backend/query-orchestrator';
 import type { Constructor, Required } from '@cubejs-backend/shared';
 import type { CubeStoreDevDriver, CubeStoreHandler, isCubeStoreSupported } from '@cubejs-backend/cubestore-driver';
 
 import { FileRepository, SchemaFileRepository } from './FileRepository';
 import { RefreshScheduler, ScheduledRefreshOptions } from './RefreshScheduler';
-import { OrchestratorApi } from './OrchestratorApi';
+import { OrchestratorApi, OrchestratorApiOptions } from './OrchestratorApi';
 import { CompilerApi } from './CompilerApi';
 import { DevServer } from './DevServer';
 import agentCollect from './agentCollect';
@@ -44,6 +44,7 @@ import type {
   LoggerFn,
   SystemOptions
 } from './types';
+import { ContextToOrchestratorIdFn } from './types';
 
 const { version } = require('../../../package.json');
 
@@ -56,7 +57,7 @@ export type ServerCoreInitializedOptions = Required<
   'scheduledRefreshContexts'
 >;
 
-function wrapToFnIfNeeded<T, R>(possibleFn: T|((a: R) => T)): (a: R) => T {
+function wrapToFnIfNeeded<T, R>(possibleFn: T | ((a: R) => T)): (a: R) => T {
   if (typeof possibleFn === 'function') {
     return <any>possibleFn;
   }
@@ -67,7 +68,7 @@ function wrapToFnIfNeeded<T, R>(possibleFn: T|((a: R) => T)): (a: R) => T {
 export class CubejsServerCore {
   public readonly repository: FileRepository;
 
-  protected devServer: DevServer|undefined;
+  protected devServer: DevServer | undefined;
 
   protected readonly orchestratorStorage: OrchestratorStorage = new OrchestratorStorage();
 
@@ -79,7 +80,7 @@ export class CubejsServerCore {
 
   protected compilerCache: LRUCache<string, CompilerApi>;
 
-  protected contextToOrchestratorId: any;
+  protected readonly contextToOrchestratorId: ContextToOrchestratorIdFn;
 
   protected readonly preAggregationsSchema: PreAggregationsSchemaFn;
 
@@ -95,24 +96,26 @@ export class CubejsServerCore {
 
   protected readonly standalone: boolean = true;
 
-  protected maxCompilerCacheKeep: NodeJS.Timeout|null = null;
+  protected maxCompilerCacheKeep: NodeJS.Timeout | null = null;
 
-  protected scheduledRefreshTimerInterval: CancelableInterval|null = null;
+  protected scheduledRefreshTimerInterval: CancelableInterval | null = null;
 
-  protected driver: BaseDriver|null = null;
+  protected driver: BaseDriver | null = null;
 
-  protected apiGatewayInstance: ApiGateway|null = null;
+  protected apiGatewayInstance: ApiGateway | null = null;
 
   public readonly event: (name: string, props?: object) => Promise<void>;
 
-  public projectFingerprint: string|null = null;
+  public projectFingerprint: string | null = null;
 
-  public anonymousId: string|null = null;
+  public anonymousId: string | null = null;
 
-  public coreServerVersion: string|null = null;
+  public coreServerVersion: string | null = null;
 
   public constructor(opts: CreateOptions = {}, protected readonly systemOptions?: SystemOptions) {
     optionsValidate(opts);
+
+    this.coreServerVersion = version;
 
     this.logger = opts.logger || (
       process.env.NODE_ENV !== 'production'
@@ -173,10 +176,6 @@ export class CubejsServerCore {
 
       if (!this.anonymousId) {
         this.anonymousId = getAnonymousId();
-      }
-
-      if (!this.coreServerVersion) {
-        this.coreServerVersion = version;
       }
 
       const internalExceptionsEnv = getEnv('internalExceptions');
@@ -249,9 +248,14 @@ export class CubejsServerCore {
   }
 
   protected isReadyForQueryProcessing(): boolean {
+    const hasDbCredentials =
+      Object.keys(process.env).filter(
+        (key) => (key.startsWith('CUBEJS_DB') && key !== 'CUBEJS_DB_TYPE') ||
+          key.startsWith('CUBEJS_AWS')
+      ).length > 0;
+
     return (
-      Boolean(process.env.CUBEJS_DB_HOST) ||
-      Boolean(process.env.CUBEJS_DB_BQ_PROJECT_ID) ||
+      hasDbCredentials ||
       this.systemOptions?.isCubeConfigEmpty === undefined ||
       !this.systemOptions?.isCubeConfigEmpty
     );
@@ -413,7 +417,7 @@ export class CubejsServerCore {
         devServer ? 'dev_pre_aggregations' : 'prod_pre_aggregations'
       ),
       schemaPath: process.env.CUBEJS_SCHEMA_PATH || 'schema',
-      scheduledRefreshTimer: getEnv('scheduledRefresh') !== undefined ? getEnv('scheduledRefresh') : getEnv('refreshTimer'),
+      scheduledRefreshTimer: getEnv('refreshWorkerMode'),
       sqlCache: true,
       livePreview: getEnv('livePreview'),
       ...opts,
@@ -502,7 +506,8 @@ export class CubejsServerCore {
   }
 
   protected initAgent() {
-    if (process.env.CUBEJS_AGENT_ENDPOINT_URL) {
+    const agentEndpointUrl = getEnv('agentEndpointUrl');
+    if (agentEndpointUrl) {
       const oldLogger = this.logger;
       this.preAgentLogger = oldLogger;
       this.logger = (msg, params) => {
@@ -512,7 +517,7 @@ export class CubejsServerCore {
             msg,
             ...params
           },
-          process.env.CUBEJS_AGENT_ENDPOINT_URL,
+          agentEndpointUrl,
           oldLogger
         );
       };
@@ -520,10 +525,11 @@ export class CubejsServerCore {
   }
 
   protected async flushAgent() {
-    if (process.env.CUBEJS_AGENT_ENDPOINT_URL) {
+    const agentEndpointUrl = getEnv('agentEndpointUrl');
+    if (agentEndpointUrl) {
       await agentCollect(
         { msg: 'Flush Agent' },
-        process.env.CUBEJS_AGENT_ENDPOINT_URL,
+        agentEndpointUrl,
         this.preAgentLogger
       );
     }
@@ -542,7 +548,7 @@ export class CubejsServerCore {
     } else {
       app.get('/', (req, res) => {
         res.status(200)
-          .send('<html><body>Cube.js server is running in production mode. <a href="https://cube.dev/docs/deployment#production-mode">Learn more about production mode</a>.</body></html>');
+          .send('<html><body>Cube.js server is running in production mode. <a href="https://cube.dev/docs/deployment/production-checklist">Learn more about production mode</a>.</body></html>');
       });
     }
   }
@@ -575,6 +581,7 @@ export class CubejsServerCore {
         refreshScheduler: () => new RefreshScheduler(this),
         scheduledRefreshContexts: this.options.scheduledRefreshContexts,
         scheduledRefreshTimeZones: this.options.scheduledRefreshTimeZones,
+        serverCoreVersion: this.coreServerVersion
       }
     );
   }
@@ -625,12 +632,22 @@ export class CubejsServerCore {
     }
 
     const driverPromise: Record<string, Promise<BaseDriver>> = {};
-    let externalPreAggregationsDriverPromise: Promise<BaseDriver>|null = null;
+    let externalPreAggregationsDriverPromise: Promise<BaseDriver> | null = null;
 
     const externalDbType = this.contextToExternalDbType(context);
+    // orchestrator options can be empty, if user didnt define it
+    const orchestratorOptions = this.orchestratorOptions(context) || {};
 
-    const orchestratorApi = this.createOrchestratorApi({
-      getDriver: async (dataSource = 'default') => {
+    const rollupOnlyMode = orchestratorOptions.rollupOnlyMode !== undefined
+      ? orchestratorOptions.rollupOnlyMode
+      : getEnv('rollupOnlyMode');
+
+    // External refresh is enabled for rollupOnlyMode, but it's disabled
+    // when it's both refreshWorkerMode & rollupOnlyMode
+    const externalRefresh: boolean = rollupOnlyMode && !this.options.scheduledRefreshTimer;
+
+    const orchestratorApi = this.createOrchestratorApi(
+      async (dataSource = 'default') => {
         if (driverPromise[dataSource]) {
           return driverPromise[dataSource];
         }
@@ -659,51 +676,58 @@ export class CubejsServerCore {
           }
         })();
       },
-      getExternalDriverFactory: this.options.externalDriverFactory && (async () => {
-        if (externalPreAggregationsDriverPromise) {
-          return externalPreAggregationsDriverPromise;
-        }
-
-        // eslint-disable-next-line no-return-assign
-        return externalPreAggregationsDriverPromise = (async () => {
-          let driver: BaseDriver|null = null;
-
-          try {
-            driver = await this.options.externalDriverFactory(context);
-            if (driver.setLogger) {
-              driver.setLogger(this.logger);
-            }
-
-            await driver.testConnection();
-
-            return driver;
-          } catch (e) {
-            externalPreAggregationsDriverPromise = null;
-
-            if (driver) {
-              await driver.release();
-            }
-
-            throw e;
+      {
+        externalDriverFactory: this.options.externalDriverFactory && (async () => {
+          if (externalPreAggregationsDriverPromise) {
+            return externalPreAggregationsDriverPromise;
           }
-        })();
-      }),
-      redisPrefix: orchestratorId,
-      orchestratorOptions: {
+
+          // eslint-disable-next-line no-return-assign
+          return externalPreAggregationsDriverPromise = (async () => {
+            let driver: BaseDriver | null = null;
+
+            try {
+              driver = await this.options.externalDriverFactory(context);
+              if (driver.setLogger) {
+                driver.setLogger(this.logger);
+              }
+
+              await driver.testConnection();
+
+              return driver;
+            } catch (e) {
+              externalPreAggregationsDriverPromise = null;
+
+              if (driver) {
+                await driver.release();
+              }
+
+              throw e;
+            }
+          })();
+        }),
+        contextToDbType: this.contextToDbType.bind(this),
+        contextToExternalDbType: this.contextToExternalDbType.bind(this),
+        redisPrefix: orchestratorId,
         skipExternalCacheAndQueue: externalDbType === 'cubestore',
-        ...this.options.orchestratorOptions,
-        // OrchestratorOptionsFn should have an ability to override static configuration form cube.js file
-        ...this.orchestratorOptions(context),
+        cacheAndQueueDriver: this.options.cacheAndQueueDriver,
+        // placeholder, user is able to override it from cube.js
+        rollupOnlyMode,
+        ...orchestratorOptions,
+        preAggregationsOptions: {
+          // placeholder, user is able to override it from cube.js
+          externalRefresh,
+          ...orchestratorOptions.preAggregationsOptions,
+        }
       }
-    });
+    );
 
     this.orchestratorStorage.set(orchestratorId, orchestratorApi);
 
     return orchestratorApi;
   }
 
-  protected createCompilerApi(repository, options) {
-    options = options || {};
+  protected createCompilerApi(repository, options: Record<string, any> = {}) {
     return new CompilerApi(repository, options.dbType || this.options.dbType, {
       schemaVersion: options.schemaVersion || this.options.schemaVersion,
       devServer: this.options.devServer,
@@ -719,18 +743,14 @@ export class CubejsServerCore {
     });
   }
 
-  protected createOrchestratorApi(options: any = {}): OrchestratorApi {
+  protected createOrchestratorApi(
+    getDriver: DriverFactoryByDataSource,
+    options: OrchestratorApiOptions
+  ): OrchestratorApi {
     return new OrchestratorApi(
-      options.getDriver || this.getDriver.bind(this),
+      getDriver,
       this.logger,
-      {
-        redisPrefix: options.redisPrefix || process.env.CUBEJS_APP,
-        cacheAndQueueDriver: options.cacheAndQueueDriver || this.options.cacheAndQueueDriver,
-        externalDriverFactory: options.getExternalDriverFactory,
-        ...options.orchestratorOptions,
-        contextToDbType: this.contextToDbType.bind(this),
-        contextToExternalDbType: this.contextToExternalDbType.bind(this),
-      }
+      options
     );
   }
 
@@ -763,7 +783,7 @@ export class CubejsServerCore {
   /**
    * @internal Please dont use this method directly, use refreshTimer
    */
-  public async runScheduledRefresh(context: UserBackgroundContext|null, queryingOptions?: ScheduledRefreshOptions) {
+  public async runScheduledRefresh(context: UserBackgroundContext | null, queryingOptions?: ScheduledRefreshOptions) {
     return this.getRefreshScheduler().runScheduledRefresh(
       this.migrateBackgroundContext(context),
       queryingOptions
@@ -772,7 +792,7 @@ export class CubejsServerCore {
 
   protected warningBackgroundContextShow: boolean = false;
 
-  protected migrateBackgroundContext(ctx: UserBackgroundContext | null): RequestContext|null {
+  protected migrateBackgroundContext(ctx: UserBackgroundContext | null): RequestContext | null {
     let result: any = null;
 
     // We renamed authInfo to securityContext, but users can continue to use both ways
@@ -864,7 +884,7 @@ export class CubejsServerCore {
     }
   }
 
-  protected causeErrorPromise: Promise<any>|null = null;
+  protected causeErrorPromise: Promise<any> | null = null;
 
   protected onUncaughtException = async (e: Error) => {
     console.error(e.stack || e);

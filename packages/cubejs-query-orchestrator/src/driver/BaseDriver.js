@@ -199,8 +199,7 @@ export class BaseDriver {
     const rows = await this.query(query, values);
     if (rows.length === 0) {
       throw new Error(
-        'Unable to detect column types for pre-aggregation on empty values in readOnly mode. \n' +
-        'https://cube.dev/docs/caching/using-pre-aggregations#read-only-data-source'
+        'Unable to detect column types for pre-aggregation on empty values in readOnly mode.'
       );
     }
 
@@ -209,8 +208,8 @@ export class BaseDriver {
     const types = fields.map(field => ({
       name: field,
       type: Object.keys(DbTypeValueMatcher).find(
-        type => !rows.filter(row => !!row[field]).find(row => !DbTypeValueMatcher[type](row[field])) &&
-          rows.find(row => !!row[field])
+        type => !rows.filter(row => field in row).find(row => !DbTypeValueMatcher[type](row[field])) &&
+          rows.find(row => field in row)
       ) || 'text'
     }));
 
@@ -224,24 +223,27 @@ export class BaseDriver {
     return false;
   }
 
+  /**
+   * @protected
+   */
+  informationColumnsSchemaReducer(result, i) {
+    let schema = (result[i.table_schema] || {});
+    const tables = (schema[i.table_name] || []);
+
+    tables.push({ name: i.column_name, type: i.data_type, attributes: i.key_type ? ['primaryKey'] : [] });
+
+    tables.sort();
+    schema[i.table_name] = tables;
+    schema = sortByKeys(schema);
+    result[i.table_schema] = schema;
+
+    return sortByKeys(result);
+  }
+
   tablesSchema() {
     const query = this.informationSchemaQuery();
 
-    const reduceCb = (result, i) => {
-      let schema = (result[i.table_schema] || {});
-      const tables = (schema[i.table_name] || []);
-
-      tables.push({ name: i.column_name, type: i.data_type, attributes: i.key_type ? ['primaryKey'] : [] });
-
-      tables.sort();
-      schema[i.table_name] = tables;
-      schema = sortByKeys(schema);
-      result[i.table_schema] = schema;
-
-      return sortByKeys(result);
-    };
-
-    return this.query(query).then(data => reduce(reduceCb, {}, data));
+    return this.query(query).then(data => reduce(this.informationColumnsSchemaReducer, {}, data));
   }
 
   /**

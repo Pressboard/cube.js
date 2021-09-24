@@ -4,7 +4,7 @@ import cx from 'classnames';
 
 import ScrollLink from '../templates/ScrollSpyLink';
 
-import styles from '../../../static/styles/index.module.scss';
+import * as styles from '../../../static/styles/index.module.scss';
 import { SectionWithoutNodes } from '../../types';
 import { layout } from '../../theme';
 
@@ -26,7 +26,7 @@ const HeadingLink = ({ id, title, type }: SectionWithoutNodes) => {
     <ScrollLink
       activeClass={styles.scrollspyCurrent}
       to={id}
-      key={id}
+      key={id + Math.random()}
       className={cx(styles.scrollspyLink, {
         [styles.scrollspySubitem]: type === 'h3',
         [styles.scrollspyTop]: id === 'top',

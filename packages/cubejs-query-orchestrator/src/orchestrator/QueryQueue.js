@@ -24,7 +24,8 @@ export class QueryQueue {
       continueWaitTimeout: this.continueWaitTimeout,
       orphanedTimeout: this.orphanedTimeout,
       heartBeatTimeout: this.heartBeatInterval * 4,
-      redisPool: options.redisPool
+      redisPool: options.redisPool,
+      getQueueEventsBus: options.getQueueEventsBus
     };
     this.queueDriver = options.cacheAndQueueDriver === 'redis' ?
       new RedisQueueDriver(queueDriverOptions) :
@@ -62,16 +63,25 @@ export class QueryQueue {
       if (!(priority >= -10000 && priority <= 10000)) {
         throw new Error('Priority should be between -10000 and 10000');
       }
-      let result = await redisClient.getResult(queryKey);
+      let result = !query.forceBuild && await redisClient.getResult(queryKey);
+      
       if (result) {
         return this.parseResult(result);
       }
+
+      if (query.forceBuild) {
+        const jobExists = await redisClient.getQueryDef(queryKey);
+        if (jobExists) return null;
+      }
+
       const time = new Date().getTime();
       const keyScore = time + (10000 - priority) * 1E14;
 
+      const orphanedTimeout = 'orphanedTimeout' in query ? query.orphanedTimeout : this.orphanedTimeout;
+      const orphanedTime = time + (orphanedTimeout * 1000);
       // eslint-disable-next-line no-unused-vars
       const [added, b, c, queueSize] = await redisClient.addToQueue(
-        keyScore, queryKey, time, queryHandler, query, priority, options
+        keyScore, queryKey, orphanedTime, queryHandler, query, priority, options
       );
 
       if (added > 0) {
@@ -81,6 +91,10 @@ export class QueryQueue {
           queryKey,
           queuePrefix: this.redisQueuePrefix,
           requestId: options.requestId,
+          metadata: query.metadata,
+          preAggregationId: query.preAggregation?.preAggregationId,
+          newVersionEntry: query.newVersionEntry,
+          forceBuild: query.forceBuild,
         });
       }
 
@@ -151,6 +165,73 @@ export class QueryQueue {
     return this.reconcilePromise;
   }
 
+  async getQueries() {
+    const redisClient = await this.queueDriver.createConnection();
+    try {
+      const [stalledQueries, orphanedQueries, activeQueries, toProcessQueries] = await Promise.all([
+        redisClient.getStalledQueries(),
+        redisClient.getOrphanedQueries(),
+        redisClient.getActiveQueries(),
+        redisClient.getToProcessQueries()
+      ]);
+
+      const mapWithDefinition = (arr) => Promise.all(arr.map(async queryKey => ({
+        ...(await redisClient.getQueryDef(queryKey)),
+        queryKey
+      })));
+
+      const [stalled, orphaned, active, toProcess] = await Promise.all(
+        [stalledQueries, orphanedQueries, activeQueries, toProcessQueries].map(arr => mapWithDefinition(arr))
+      );
+
+      const result = {
+        orphaned,
+        stalled,
+        active,
+        toProcess
+      };
+
+      return Object.values(Object.keys(result).reduce((obj, status) => {
+        result[status].forEach(query => {
+          if (!obj[query.queryKey]) {
+            obj[query.queryKey] = {
+              ...query,
+              status: []
+            };
+          }
+  
+          obj[query.queryKey].status.push(status);
+        });
+        return obj;
+      }, {}));
+    } finally {
+      this.queueDriver.release(redisClient);
+    }
+  }
+
+  async cancelQuery(queryKey) {
+    const redisClient = await this.queueDriver.createConnection();
+    try {
+      const query = await redisClient.cancelQuery(queryKey);
+
+      if (query) {
+        this.logger('Cancelling query manual', {
+          queryKey: query.queryKey,
+          queuePrefix: this.redisQueuePrefix,
+          requestId: query.requestId,
+          metadata: query.query?.metadata,
+          preAggregationId: query.query?.preAggregation?.preAggregationId,
+          newVersionEntry: query.query?.newVersionEntry,
+        });
+        await this.sendCancelMessageFn(query);
+      }
+
+      return true;
+    } finally {
+      this.queueDriver.release(redisClient);
+    }
+  }
+
   async reconcileQueueImpl() {
     const redisClient = await this.queueDriver.createConnection();
     try {
@@ -166,7 +247,10 @@ export class QueryQueue {
           this.logger('Removing orphaned query', {
             queryKey: query.queryKey,
             queuePrefix: this.redisQueuePrefix,
-            requestId: query.requestId
+            requestId: query.requestId,
+            metadata: query.query?.metadata,
+            preAggregationId: query.query?.preAggregation?.preAggregationId,
+            newVersionEntry: query.query?.newVersionEntry,
           });
           await this.sendCancelMessageFn(query);
         }
@@ -325,7 +409,10 @@ export class QueryQueue {
           queryKey: query.queryKey,
           queuePrefix: this.redisQueuePrefix,
           requestId: query.requestId,
-          timeInQueue
+          timeInQueue,
+          metadata: query.query?.metadata,
+          preAggregationId: query.query?.preAggregation?.preAggregationId,
+          newVersionEntry: query.query?.newVersionEntry,
         });
         await redisClient.optimisticQueryUpdate(queryKey, { startQueryTime }, processingId);
 
@@ -346,7 +433,10 @@ export class QueryQueue {
                       queryKey: query.queryKey,
                       error: e.stack || e,
                       queuePrefix: this.redisQueuePrefix,
-                      requestId: query.requestId
+                      requestId: query.requestId,
+                      metadata: query.query?.metadata,
+                      preAggregationId: query.query?.preAggregation?.preAggregationId,
+                      newVersionEntry: query.query?.newVersionEntry,
                     });
                   }
                   return null;
@@ -361,7 +451,10 @@ export class QueryQueue {
             queryKey: query.queryKey,
             queuePrefix: this.redisQueuePrefix,
             requestId: query.requestId,
-            timeInQueue
+            timeInQueue,
+            metadata: query.query?.metadata,
+            preAggregationId: query.query?.preAggregation?.preAggregationId,
+            newVersionEntry: query.query?.newVersionEntry,
           });
         } catch (e) {
           executionResult = {
@@ -375,6 +468,9 @@ export class QueryQueue {
             queuePrefix: this.redisQueuePrefix,
             requestId: query.requestId,
             timeInQueue,
+            metadata: query.query?.metadata,
+            preAggregationId: query.query?.preAggregation?.preAggregationId,
+            newVersionEntry: query.query?.newVersionEntry,
             error: (e.stack || e).toString()
           });
           if (e instanceof TimeoutError) {
@@ -384,7 +480,10 @@ export class QueryQueue {
                 processingId,
                 queryKey: queryWithCancelHandle.queryKey,
                 queuePrefix: this.redisQueuePrefix,
-                requestId: queryWithCancelHandle.requestId
+                requestId: queryWithCancelHandle.requestId,
+                metadata: queryWithCancelHandle.query?.metadata,
+                preAggregationId: queryWithCancelHandle.query?.preAggregation?.preAggregationId,
+                newVersionEntry: queryWithCancelHandle.query?.newVersionEntry,
               });
               await this.sendCancelMessageFn(queryWithCancelHandle);
             }
@@ -399,7 +498,10 @@ export class QueryQueue {
             warn: 'Result for query was not set due to processing lock wasn\'t acquired',
             queryKey: query.queryKey,
             queuePrefix: this.redisQueuePrefix,
-            requestId: query.requestId
+            requestId: query.requestId,
+            metadata: query.query?.metadata,
+            preAggregationId: query.query?.preAggregation?.preAggregationId,
+            newVersionEntry: query.query?.newVersionEntry,
           });
         }
 

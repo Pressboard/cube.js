@@ -84,7 +84,7 @@ const querySchema = Joi.object().keys({
   filters: Joi.array().items(oneFilter, oneCondition),
   timeDimensions: Joi.array().items(Joi.object().keys({
     dimension: id.required(),
-    granularity: Joi.valid('day', 'month', 'year', 'week', 'hour', 'minute', 'second', null),
+    granularity: Joi.valid('quarter', 'day', 'month', 'year', 'week', 'hour', 'minute', 'second', null),
     dateRange: [
       Joi.array().items(Joi.string()).min(1).max(2),
       Joi.string()
@@ -215,11 +215,13 @@ export const normalizeQuery = (query) => {
 };
 
 const queryPreAggregationsSchema = Joi.object().keys({
+  metadata: Joi.object(),
   timezone: Joi.string(),
   timezones: Joi.array().items(Joi.string()),
   preAggregations: Joi.array().items(Joi.object().keys({
     id: Joi.string().required(),
-    refreshRange: Joi.array().items(Joi.string()).length(2)
+    partitions: Joi.array().items(Joi.string()),
+    refreshRange: Joi.array().items(Joi.string()).length(2), // TODO: Deprecate after cloud changes
   }))
 });
 
@@ -230,7 +232,43 @@ export const normalizeQueryPreAggregations = (query, defaultValues) => {
   }
 
   return {
+    metadata: query.metadata,
     timezones: query.timezones || (query.timezone && [query.timezone]) || defaultValues.timezones,
     preAggregations: query.preAggregations
   };
+};
+
+const queryPreAggregationPreviewSchema = Joi.object().keys({
+  preAggregationId: Joi.string().required(),
+  timezone: Joi.string().required(),
+  versionEntry: Joi.object().required().keys({
+    content_version: Joi.string(),
+    last_updated_at: Joi.number(),
+    naming_version: Joi.number(),
+    structure_version: Joi.string(),
+    table_name: Joi.string()
+  })
+});
+
+export const normalizeQueryPreAggregationPreview = (query) => {
+  const { error } = Joi.validate(query, queryPreAggregationPreviewSchema);
+  if (error) {
+    throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
+  }
+
+  return query;
+};
+
+const queryCancelPreAggregationPreviewSchema = Joi.object().keys({
+  dataSource: Joi.string(),
+  queryKeys: Joi.array().items(Joi.string())
+});
+
+export const normalizeQueryCancelPreAggregations = query => {
+  const { error } = Joi.validate(query, queryCancelPreAggregationPreviewSchema);
+  if (error) {
+    throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
+  }
+
+  return query;
 };

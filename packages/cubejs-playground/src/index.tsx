@@ -14,6 +14,7 @@ import {
 } from './pages';
 import { SecurityContextProvider } from './components/SecurityContext/SecurityContextProvider';
 import { AppContextProvider } from './components/AppContext';
+import { RollupDesignerContext } from './components/RollupDesigner';
 
 const history = createHashHistory();
 history.listen((location) => {
@@ -21,23 +22,38 @@ history.listen((location) => {
   page(props);
 });
 
-async function onTokenPayloadChange(payload: string = '') {
+async function onTokenPayloadChange(payload: Record<string, any>, token) {
+  if (token != null) {
+    return token;
+  }
+
   const response = await fetch('/playground/token', {
     method: 'post',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      payload: JSON.parse(payload),
+      payload,
     }),
   });
-  const { token } = await response.json();
-  return token;
+  const json = await response.json();
+  return json.token;
+}
+
+if (
+  window.location.port === '3080' &&
+  window.location.pathname.includes('/playground/live-preview/start')
+) {
+  fetch(window.location.pathname).then(() => window.close());
 }
 
 ReactDOM.render(
   <Router history={history}>
-    <AppContextProvider>
+    <AppContextProvider
+      playgroundContext={{
+        isCloud: false,
+      }}
+    >
       <App>
         <Route key="index" exact path="/" component={IndexPage} />
         <Route
@@ -45,7 +61,9 @@ ReactDOM.render(
           path="/build"
           component={(props) => {
             return (
-              <SecurityContextProvider onTokenPayloadChange={onTokenPayloadChange}>
+              <SecurityContextProvider
+                onTokenPayloadChange={onTokenPayloadChange}
+              >
                 <ExplorePage {...props} />
               </SecurityContextProvider>
             );

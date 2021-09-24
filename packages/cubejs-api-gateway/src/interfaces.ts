@@ -29,7 +29,8 @@ export type QueryTimeDimensionGranularity =
   | 'day'
   | 'week'
   | 'month'
-  | 'year';
+  | 'year'
+  | 'quarter';
 
 export interface QueryTimeDimension {
   dimension: string;
@@ -104,6 +105,6 @@ export type SecurityContextExtractorFn = (ctx: Readonly<RequestContext>) => any;
 export type RequestLoggerMiddlewareFn = (req: ExpressRequest, res: ExpressResponse, next: ExpressNextFunction) => void;
 
 // @todo ctx can be passed from SubscriptionServer that will cause incapability with Express.Request
-export type CheckAuthFn = (ctx: any, authorization?: string) => Promise<void>|void;
+export type CheckAuthFn = (ctx: any, authorization?: string) => Promise<void> | void;
 
-export type ExtendContextFn = (req: ExpressRequest) => Promise<RequestExtension>|RequestExtension;
+export type ExtendContextFn = (req: ExpressRequest) => Promise<RequestExtension> | RequestExtension;

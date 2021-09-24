@@ -33,7 +33,7 @@ use core::fmt;
 use datafusion::catalog::TableReference;
 use datafusion::datasource::datasource::{Statistics, TableProviderFilterPushDown};
 use datafusion::error::DataFusionError;
-use datafusion::logical_plan::{DFSchemaRef, Expr, LogicalPlan, PlanVisitor, ToDFSchema};
+use datafusion::logical_plan::{Expr, LogicalPlan, PlanVisitor};
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::udaf::AggregateUDF;
 use datafusion::physical_plan::udf::ScalarUDF;
@@ -41,7 +41,7 @@ use datafusion::physical_plan::{collect, ExecutionPlan, Partitioning, SendableRe
 use datafusion::prelude::ExecutionConfig;
 use datafusion::sql::parser::Statement;
 use datafusion::sql::planner::{ContextProvider, SqlToRel};
-use datafusion::{datasource::TableProvider, prelude::ExecutionContext};
+use datafusion::{cube_ext, datasource::TableProvider, prelude::ExecutionContext};
 use itertools::Itertools;
 use log::{debug, trace};
 use mockall::automock;
@@ -115,7 +115,7 @@ impl QueryPlanner for QueryPlannerImpl {
         let plan_ctx = ctx.clone();
         let plan_to_move = plan.clone();
         let physical_plan =
-            tokio::task::spawn_blocking(move || plan_ctx.create_physical_plan(&plan_to_move))
+            cube_ext::spawn_blocking(move || plan_ctx.create_physical_plan(&plan_to_move))
                 .await??;
 
         let execution_time = SystemTime::now();
@@ -123,8 +123,7 @@ impl QueryPlanner for QueryPlannerImpl {
         let execution_time = execution_time.elapsed()?;
         app_metrics::META_QUERY_TIME_MS.report(execution_time.as_millis() as i64);
         debug!("Meta query data processing time: {:?}", execution_time,);
-        let data_frame =
-            tokio::task::spawn_blocking(move || batch_to_dataframe(&results)).await??;
+        let data_frame = cube_ext::spawn_blocking(move || batch_to_dataframe(&results)).await??;
         Ok(data_frame)
     }
 }
@@ -244,6 +243,8 @@ impl ContextProvider for MetaStoreSchemaProvider {
             "coalesce" | "COALESCE" => CubeScalarUDFKind::Coalesce,
             "now" | "NOW" => CubeScalarUDFKind::Now,
             "unix_timestamp" | "UNIX_TIMESTAMP" => CubeScalarUDFKind::UnixTimestamp,
+            "date_add" | "DATE_ADD" => CubeScalarUDFKind::DateAdd,
+            "date_sub" | "DATE_SUB" => CubeScalarUDFKind::DateSub,
             _ => return None,
         };
         return Some(Arc::new(scalar_udf_by_kind(kind).descriptor()));
@@ -339,7 +340,7 @@ impl TableProvider for InfoSchemaTableProvider {
 
     fn scan(
         &self,
-        _projection: &Option<Vec<usize>>,
+        projection: &Option<Vec<usize>>,
         _batch_size: usize,
         _filters: &[Expr],
         _limit: Option<usize>,
@@ -347,6 +348,8 @@ impl TableProvider for InfoSchemaTableProvider {
         let exec = InfoSchemaTableExec {
             meta_store: self.meta_store.clone(),
             table: self.table.clone(),
+            projection: projection.clone(),
+            projected_schema: project_schema(&self.schema(), projection.as_deref()),
         };
         Ok(Arc::new(exec))
     }
@@ -360,10 +363,24 @@ impl TableProvider for InfoSchemaTableProvider {
     }
 }
 
+fn project_schema(s: &Schema, projection: Option<&[usize]>) -> SchemaRef {
+    let projection = match projection {
+        None => return Arc::new(s.clone()),
+        Some(p) => p,
+    };
+    let mut fields = Vec::with_capacity(projection.len());
+    for &i in projection {
+        fields.push(s.field(i).clone())
+    }
+    Arc::new(Schema::new(fields))
+}
+
 #[derive(Clone)]
 pub struct InfoSchemaTableExec {
     meta_store: Arc<dyn MetaStore>,
     table: InfoSchemaTable,
+    projected_schema: SchemaRef,
+    projection: Option<Vec<usize>>,
 }
 
 impl fmt::Debug for InfoSchemaTableExec {
@@ -378,8 +395,8 @@ impl ExecutionPlan for InfoSchemaTableExec {
         self
     }
 
-    fn schema(&self) -> DFSchemaRef {
-        self.table.schema().to_dfschema_ref().unwrap()
+    fn schema(&self) -> SchemaRef {
+        self.projected_schema.clone()
     }
 
     fn output_partitioning(&self) -> Partitioning {
@@ -402,15 +419,15 @@ impl ExecutionPlan for InfoSchemaTableExec {
         partition: usize,
     ) -> Result<SendableRecordBatchStream, DataFusionError> {
         let batch = self.table.scan(self.meta_store.clone()).await?;
-        let schema = batch.schema();
-        let mem_exec = MemoryExec::try_new(&vec![vec![batch]], schema, None)?;
+        let mem_exec =
+            MemoryExec::try_new(&vec![vec![batch]], self.schema(), self.projection.clone())?;
         mem_exec.execute(partition).await
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CubeTableLogical {
-    table: TablePath,
+    pub table: TablePath,
     schema: SchemaRef,
 }
 

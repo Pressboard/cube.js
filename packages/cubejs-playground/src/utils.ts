@@ -1,5 +1,5 @@
 import { notification } from 'antd';
-import fetch, { RequestInit, Response } from 'node-fetch';
+import { pretty } from 'js-object-pretty-print';
 
 import { PlaygroundEvent } from './types';
 
@@ -66,6 +66,10 @@ platformBrowserDynamic().bootstrapModule(AppModule)
   },
 };
 
+const peerDependencies = {
+  'react-chartjs-2': 'chart.js',
+};
+
 export function codeSandboxDefinition(template, files, dependencies = []) {
   return {
     files: {
@@ -79,7 +83,14 @@ export function codeSandboxDefinition(template, files, dependencies = []) {
             ...bootstrapDefinition[template]?.dependencies,
             ...dependencies.reduce((memo, d) => {
               const [name, version] = Array.isArray(d) ? d : [d, 'latest'];
-              return { ...memo, [name]: version };
+
+              return {
+                ...memo,
+                [name]: version,
+                ...(peerDependencies[name]
+                  ? { [peerDependencies[name]]: 'latest' }
+                  : null),
+              };
             }, {}),
           },
         },
@@ -129,21 +140,20 @@ export function fetchPoll(
     canceled = true;
   }
 
-  function request() {
-    setTimeout(async () => {
-      const response = await fetch(url, fetchOptions);
+  async function request() {
+    const response = await fetch(url, fetchOptions);
 
-      if (!canceled) {
-        callback({
-          response,
-          cancel,
-          retries,
-        });
-        request();
-      }
+    if (!canceled) {
+      callback({
+        response,
+        cancel,
+        retries,
+      });
 
-      retries++;
-    }, timeout);
+      setTimeout(request, timeout);
+    }
+
+    retries++;
   }
 
   request();
@@ -189,4 +199,11 @@ export async function copyToClipboard(value, message = 'Copied to clipboard') {
 
 export function formatNumber(num: number): string {
   return num.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,');
+}
+
+export function prettifyObject(value: Object) {
+  return pretty(value, 2)
+    .replaceAll(/([^\\]|)'/g, `\\'`)
+    .replaceAll(/"/g, `'`)
+    .replaceAll(/\[[\s]+\]/g, '[]');
 }

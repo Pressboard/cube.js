@@ -19,7 +19,7 @@ declare module '@cubejs-client/react' {
     TCubeMeasure,
     TCubeDimension,
     ProgressResponse,
-    TDryRunResponse,
+    DryRunResponse,
     TOrderMember,
     QueryOrder,
     TSourceAxis,
@@ -215,7 +215,7 @@ declare module '@cubejs-client/react' {
     /**
      * @hidden
      */
-    onSchemaChange?: (props: SchemaChangeProps) => void
+    onSchemaChange?: (props: SchemaChangeProps) => void;
   };
 
   /**
@@ -223,8 +223,8 @@ declare module '@cubejs-client/react' {
    */
   type SchemaChangeProps = {
     schemaVersion: number;
-    refresh: () => Promise<void>
-  }
+    refresh: () => Promise<void>;
+  };
 
   type QueryBuilderState = VizState & {
     query?: Query;
@@ -308,7 +308,7 @@ declare module '@cubejs-client/react' {
     validatedQuery: Query;
     refresh: () => void;
     missingMembers: string[];
-    dryRunResponse?: TDryRunResponse;
+    dryRunResponse?: DryRunResponse;
   };
 
   export type AvailableMembers = {
@@ -316,14 +316,14 @@ declare module '@cubejs-client/react' {
     dimensions: AvailableCube<TCubeDimension>[];
     segments: AvailableCube<TCubeSegment>[];
     timeDimensions: AvailableCube<TCubeDimension>[];
-  }
-
-  export type AvailableCube<T = any> = {
-    cubeName: string,
-    cubeTitle: string,
-    members: T[]
   };
 
+  // todo: CubeMember
+  export type AvailableCube<T = any> = {
+    cubeName: string;
+    cubeTitle: string;
+    members: T[];
+  };
 
   /**
    * `<QueryBuilder />` is used to build interactive analytics query builders. It abstracts state management and API calls to Cube.js Backend. It uses render prop technique and doesn’t render anything itself, but calls the render function instead.
@@ -452,29 +452,65 @@ declare module '@cubejs-client/react' {
     isLoading: boolean;
     resultSet: ResultSet<TData> | null;
     progress: ProgressResponse;
-    refetch: () => void;
+    refetch: () => Promise<void>;
   };
 
   /**
    * @hidden
    */
-  type UseDryRunResult = {
+  type CubeFetchOptions = {
+    skip?: boolean;
+    cubejsApi?: CubejsApi;
+    query?: Query;
+  };
+
+  /**
+   * @hidden
+   */
+  type CubeFetchResult<T> = {
     isLoading: boolean;
     error: Error | null;
-    result: TDryRunResponse;
+    response: T;
   };
 
   /**
    * @hidden
    */
-  type UseDryRunOptions = {
-    skip?: boolean;
+  type UseDryRunResult = CubeFetchResult<DryRunResponse>;
+
+  /**
+   * @hidden
+   */
+  export function useDryRun(query: Query | Query[], options?: CubeFetchOptions): UseDryRunResult;
+
+  /**
+   * @hidden
+   */
+  export type LoadLazyDryRunOptions = {
+    query?: Query | Query[];
   };
 
   /**
    * @hidden
    */
-  export function useDryRun(query: Query | Query[], options?: UseDryRunOptions): UseDryRunResult;
+  export function useLazyDryRun(
+    query?: Query | Query[],
+    options?: CubeFetchOptions
+  ): [(loadOptions?: LoadLazyDryRunOptions) => Promise<void>, UseDryRunResult];
+
+  /**
+   * @hidden
+   */
+  type UseCubeSqlResponse = {
+    sql: string;
+  };
+
+  export function useCubeMeta(options?: Omit<CubeFetchOptions, 'query'>): CubeFetchResult<Meta>;
+
+  /**
+   * @hidden
+   */
+  export function useCubeSql(query: Query | Query[], options?: CubeFetchOptions): UseDryRunResult;
 
   /**
    * Checks whether the query is ready
@@ -591,8 +627,8 @@ declare module '@cubejs-client/react' {
     member?: string;
     operator: BinaryOperator | UnaryOperator;
     values?: string[];
-    dimension: TCubeDimension | TCubeMeasure
-  }
+    dimension: TCubeDimension | TCubeMeasure;
+  };
   type FilterUpdater = MemberUpdater<FilterUpdateFields>;
 
   type OrderUpdater = {
