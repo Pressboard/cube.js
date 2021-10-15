@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.41](https://github.com/cube-js/cube.js/compare/v0.28.40...v0.28.41) (2021-10-12)
+
+
+### Features
+
+* Introduce @cubejs-backend/native 🦀  ([#3531](https://github.com/cube-js/cube.js/issues/3531)) ([5fd511e](https://github.com/cube-js/cube.js/commit/5fd511e8804c26d06bdc166df05d630c650f23fc))
+
+
+
+
+
+## [0.28.40](https://github.com/cube-js/cube.js/compare/v0.28.39...v0.28.40) (2021-09-30)
+
+
+### Features
+
+* **docker:** Use Node 12.22.6 ([9de777c](https://github.com/cube-js/cube.js/commit/9de777c893d0a0bf9c3b01a4c081eab24b98c417))
+
+
+
+
+
 ## [0.28.39](https://github.com/cube-js/cube.js/compare/v0.28.38...v0.28.39) (2021-09-22)
 
 **Note:** Version bump only for package @cubejs-backend/docker
