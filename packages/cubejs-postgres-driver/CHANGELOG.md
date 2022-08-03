@@ -3,6 +3,567 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.43](https://github.com/cube-js/cube.js/compare/v0.30.42...v0.30.43) (2022-07-28)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.30.39](https://github.com/cube-js/cube.js/compare/v0.30.38...v0.30.39) (2022-07-25)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.30.34](https://github.com/cube-js/cube.js/compare/v0.30.33...v0.30.34) (2022-07-12)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.30.30](https://github.com/cube-js/cube.js/compare/v0.30.29...v0.30.30) (2022-07-05)
+
+
+### Features
+
+* centralized concurrency setting ([#4735](https://github.com/cube-js/cube.js/issues/4735)) ([1c897a1](https://github.com/cube-js/cube.js/commit/1c897a13c62049e23d26009351622b2a93c0a745))
+
+
+
+
+
+## [0.30.28](https://github.com/cube-js/cube.js/compare/v0.30.27...v0.30.28) (2022-06-27)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.30.27](https://github.com/cube-js/cube.js/compare/v0.30.26...v0.30.27) (2022-06-24)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.30.25](https://github.com/cube-js/cube.js/compare/v0.30.24...v0.30.25) (2022-06-16)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.30.20](https://github.com/cube-js/cube.js/compare/v0.30.19...v0.30.20) (2022-06-11)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.30.8](https://github.com/cube-js/cube.js/compare/v0.30.7...v0.30.8) (2022-05-30)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.30.7](https://github.com/cube-js/cube.js/compare/v0.30.6...v0.30.7) (2022-05-26)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.30.6](https://github.com/cube-js/cube.js/compare/v0.30.5...v0.30.6) (2022-05-24)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.30.5](https://github.com/cube-js/cube.js/compare/v0.30.4...v0.30.5) (2022-05-23)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.30.4](https://github.com/cube-js/cube.js/compare/v0.30.3...v0.30.4) (2022-05-20)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.30.1](https://github.com/cube-js/cube.js/compare/v0.30.0...v0.30.1) (2022-05-14)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+# [0.30.0](https://github.com/cube-js/cube.js/compare/v0.29.57...v0.30.0) (2022-05-11)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.29.57](https://github.com/cube-js/cube.js/compare/v0.29.56...v0.29.57) (2022-05-11)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.29.54](https://github.com/cube-js/cube.js/compare/v0.29.53...v0.29.54) (2022-05-03)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.29.53](https://github.com/cube-js/cube.js/compare/v0.29.52...v0.29.53) (2022-04-29)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.29.52](https://github.com/cube-js/cube.js/compare/v0.29.51...v0.29.52) (2022-04-23)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.29.51](https://github.com/cube-js/cube.js/compare/v0.29.50...v0.29.51) (2022-04-22)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.29.48](https://github.com/cube-js/cube.js/compare/v0.29.47...v0.29.48) (2022-04-14)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.29.42](https://github.com/cube-js/cube.js/compare/v0.29.41...v0.29.42) (2022-04-04)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.29.37](https://github.com/cube-js/cube.js/compare/v0.29.36...v0.29.37) (2022-03-29)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.29.35](https://github.com/cube-js/cube.js/compare/v0.29.34...v0.29.35) (2022-03-24)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.29.33](https://github.com/cube-js/cube.js/compare/v0.29.32...v0.29.33) (2022-03-17)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.29.31](https://github.com/cube-js/cube.js/compare/v0.29.30...v0.29.31) (2022-03-09)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.29.30](https://github.com/cube-js/cube.js/compare/v0.29.29...v0.29.30) (2022-03-04)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.29.29](https://github.com/cube-js/cube.js/compare/v0.29.28...v0.29.29) (2022-03-03)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.29.28](https://github.com/cube-js/cube.js/compare/v0.29.27...v0.29.28) (2022-02-10)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.29.27](https://github.com/cube-js/cube.js/compare/v0.29.26...v0.29.27) (2022-02-09)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.29.26](https://github.com/cube-js/cube.js/compare/v0.29.25...v0.29.26) (2022-02-07)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.29.25](https://github.com/cube-js/cube.js/compare/v0.29.24...v0.29.25) (2022-02-03)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.29.24](https://github.com/cube-js/cube.js/compare/v0.29.23...v0.29.24) (2022-02-01)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.29.23](https://github.com/cube-js/cube.js/compare/v0.29.22...v0.29.23) (2022-01-26)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.29.22](https://github.com/cube-js/cube.js/compare/v0.29.21...v0.29.22) (2022-01-21)
+
+
+### Bug Fixes
+
+* **postgres-driver:** Support enums as UD types for columns, fix [#3946](https://github.com/cube-js/cube.js/issues/3946) ([#3957](https://github.com/cube-js/cube.js/issues/3957)) ([842cc53](https://github.com/cube-js/cube.js/commit/842cc53d59a323b56a575f697ddccacbf7b3a632))
+
+
+
+
+
+## [0.29.21](https://github.com/cube-js/cube.js/compare/v0.29.20...v0.29.21) (2022-01-17)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.29.20](https://github.com/cube-js/cube.js/compare/v0.29.19...v0.29.20) (2022-01-10)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.29.18](https://github.com/cube-js/cube.js/compare/v0.29.17...v0.29.18) (2022-01-09)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.29.17](https://github.com/cube-js/cube.js/compare/v0.29.16...v0.29.17) (2022-01-05)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.29.16](https://github.com/cube-js/cube.js/compare/v0.29.15...v0.29.16) (2022-01-05)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.29.15](https://github.com/cube-js/cube.js/compare/v0.29.14...v0.29.15) (2021-12-30)
+
+
+### Features
+
+* Introduce single unified CUBEJS_DB_QUERY_TIMEOUT env variable to set all various variables that control database query timeouts ([#3864](https://github.com/cube-js/cube.js/issues/3864)) ([33c6292](https://github.com/cube-js/cube.js/commit/33c6292059e65e293a7e3d61e1f1e0c1413eeece))
+
+
+
+
+
+## [0.29.12](https://github.com/cube-js/cube.js/compare/v0.29.11...v0.29.12) (2021-12-29)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.29.8](https://github.com/cube-js/cube.js/compare/v0.29.7...v0.29.8) (2021-12-21)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.29.7](https://github.com/cube-js/cube.js/compare/v0.29.6...v0.29.7) (2021-12-20)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.29.6](https://github.com/cube-js/cube.js/compare/v0.29.5...v0.29.6) (2021-12-19)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.29.5](https://github.com/cube-js/cube.js/compare/v0.29.4...v0.29.5) (2021-12-17)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.29.4](https://github.com/cube-js/cube.js/compare/v0.29.3...v0.29.4) (2021-12-16)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+# [0.29.0](https://github.com/cube-js/cube.js/compare/v0.28.67...v0.29.0) (2021-12-14)
+
+
+### Reverts
+
+* Revert "BREAKING CHANGE: 0.29 (#3809)" (#3811) ([db005ed](https://github.com/cube-js/cube.js/commit/db005edc04d48e8251250ab9d0e19f496cf3b52b)), closes [#3809](https://github.com/cube-js/cube.js/issues/3809) [#3811](https://github.com/cube-js/cube.js/issues/3811)
+
+
+* BREAKING CHANGE: 0.29 (#3809) ([6f1418b](https://github.com/cube-js/cube.js/commit/6f1418b9963774844f341682e594601a56bb0084)), closes [#3809](https://github.com/cube-js/cube.js/issues/3809)
+
+
+### BREAKING CHANGES
+
+* Drop support for Node.js 10 (12.x is a minimal version)
+* Upgrade Node.js to 14 for Docker images
+* Drop support for Node.js 15
+
+
+
+
+
+## [0.28.67](https://github.com/cube-js/cube.js/compare/v0.28.66...v0.28.67) (2021-12-14)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.28.66](https://github.com/cube-js/cube.js/compare/v0.28.65...v0.28.66) (2021-12-14)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.28.65](https://github.com/cube-js/cube.js/compare/v0.28.64...v0.28.65) (2021-12-10)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.28.64](https://github.com/cube-js/cube.js/compare/v0.28.63...v0.28.64) (2021-12-05)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.28.63](https://github.com/cube-js/cube.js/compare/v0.28.62...v0.28.63) (2021-12-03)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.28.61](https://github.com/cube-js/cube.js/compare/v0.28.60...v0.28.61) (2021-11-30)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.28.60](https://github.com/cube-js/cube.js/compare/v0.28.59...v0.28.60) (2021-11-25)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.28.59](https://github.com/cube-js/cube.js/compare/v0.28.58...v0.28.59) (2021-11-21)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.28.58](https://github.com/cube-js/cube.js/compare/v0.28.57...v0.28.58) (2021-11-18)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.28.56](https://github.com/cube-js/cube.js/compare/v0.28.55...v0.28.56) (2021-11-14)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.28.55](https://github.com/cube-js/cube.js/compare/v0.28.54...v0.28.55) (2021-11-12)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.28.53](https://github.com/cube-js/cube.js/compare/v0.28.52...v0.28.53) (2021-11-04)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.28.52](https://github.com/cube-js/cube.js/compare/v0.28.51...v0.28.52) (2021-11-03)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.28.50](https://github.com/cube-js/cube.js/compare/v0.28.49...v0.28.50) (2021-10-28)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.28.48](https://github.com/cube-js/cube.js/compare/v0.28.47...v0.28.48) (2021-10-22)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.28.47](https://github.com/cube-js/cube.js/compare/v0.28.46...v0.28.47) (2021-10-22)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.28.46](https://github.com/cube-js/cube.js/compare/v0.28.45...v0.28.46) (2021-10-20)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.28.45](https://github.com/cube-js/cube.js/compare/v0.28.44...v0.28.45) (2021-10-19)
+
+**Note:** Version bump only for package @cubejs-backend/postgres-driver
+
+
+
+
+
+## [0.28.42](https://github.com/cube-js/cube.js/compare/v0.28.41...v0.28.42) (2021-10-15)
+
+
+### Bug Fixes
+
+* **postgres-drive:** Move cubejs-backend/testing to devDep (reduce size) ([a3667c6](https://github.com/cube-js/cube.js/commit/a3667c675ec1b2487f669fe05532ee094ae1ca8c))
+
+
+
+
+
 ## [0.28.41](https://github.com/cube-js/cube.js/compare/v0.28.40...v0.28.41) (2021-10-12)
 
 **Note:** Version bump only for package @cubejs-backend/postgres-driver

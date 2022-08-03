@@ -5,9 +5,21 @@ const GenericTypeToMSSql = {
   string: 'nvarchar(max)',
   text: 'nvarchar(max)',
   timestamp: 'datetime2',
+  uuid: 'uniqueidentifier'
 };
 
+const MSSqlToGenericType = {
+  uniqueidentifier: 'uuid'
+}
+
 class MSSqlDriver extends BaseDriver {
+  /**
+   * Returns default concurrency value.
+   */
+  static getDefaultConcurrency() {
+    return 2;
+  }
+
   constructor(config) {
     super();
     this.config = {
@@ -24,7 +36,7 @@ class MSSqlDriver extends BaseDriver {
         useUTC: false
       },
       pool: {
-        max: 8,
+        max: config.maxPoolSize || 8,
         min: 0,
         evictionRunIntervalMillis: 10000,
         softIdleTimeoutMillis: 30000,
@@ -129,6 +141,10 @@ class MSSqlDriver extends BaseDriver {
 
   fromGenericType(columnType) {
     return GenericTypeToMSSql[columnType] || super.fromGenericType(columnType);
+  }
+
+  toGenericType(columnType){
+    return MSSqlToGenericType[columnType] || super.toGenericType(columnType);
   }
 
   readOnly() {

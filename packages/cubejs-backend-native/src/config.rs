@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use crate::{auth::NodeBridgeAuthService, transport::NodeBridgeTransport};
 use cubesql::{
-    config::{Config, ConfigObj, CubeServices},
-    mysql::SqlAuthService,
-    schema::SchemaService,
+    config::{Config, CubeServices},
+    sql::SqlAuthService,
+    transport::TransportService,
 };
 
 #[derive(Clone)]
@@ -13,12 +13,23 @@ pub struct NodeConfig {
 }
 
 impl NodeConfig {
-    pub fn config(&self) -> Arc<dyn ConfigObj> {
-        self.config.config_obj()
-    }
-
-    pub fn new() -> NodeConfig {
+    pub fn new(port: Option<u16>, pg_port: Option<u16>, nonce: Option<String>) -> NodeConfig {
         let config = Config::default();
+        let config = config.update_config(|mut c| {
+            if let Some(p) = port {
+                c.bind_address = Some(format!("0.0.0.0:{}", p));
+            };
+
+            if let Some(p) = pg_port {
+                c.postgres_bind_address = Some(format!("0.0.0.0:{}", p));
+            };
+
+            if let Some(n) = nonce {
+                c.nonce = Some(n.as_bytes().to_vec());
+            }
+
+            c
+        });
 
         Self { config }
     }
@@ -29,10 +40,11 @@ impl NodeConfig {
         auth: Arc<NodeBridgeAuthService>,
     ) -> CubeServices {
         let injector = self.config.injector();
+
         self.config.configure_injector().await;
 
         injector
-            .register_typed::<dyn SchemaService, _, _, _>(async move |_| transport)
+            .register_typed::<dyn TransportService, _, _, _>(async move |_| transport)
             .await;
 
         injector

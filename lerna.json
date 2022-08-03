@@ -1,11 +1,11 @@
 {
-  "version": "0.28.41",
+  "version": "0.30.44",
   "npmClient": "yarn",
   "useWorkspaces": true,
   "packages": [
     "docs",
     "packages/*",
-    "rust"
+    "rust/*"
   ],
   "command": {
     "bootstrap": {

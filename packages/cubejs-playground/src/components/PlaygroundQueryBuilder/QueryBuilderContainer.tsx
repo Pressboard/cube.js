@@ -2,12 +2,11 @@ import { LockOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { CubeProvider } from '@cubejs-client/react';
 import { Card, Space } from 'antd';
 import { useLayoutEffect } from 'react';
-import { useHistory } from 'react-router';
+import { useHistory } from 'react-router-dom';
 import styled from 'styled-components';
 
 import { Button, CubeLoader } from '../../atoms';
-import { useCubejsApi, useSecurityContext } from '../../hooks';
-// import { LightningIcon } from '../../shared/icons/LightningIcon';
+import { useAppContext, useCubejsApi, useSecurityContext } from '../../hooks';
 import { ChartRendererStateProvider } from '../QueryTabs/ChartRendererStateProvider';
 import { QueryTabs, QueryTabsProps } from '../QueryTabs/QueryTabs';
 import {
@@ -30,28 +29,21 @@ const StyledCard = styled(Card)`
   }
 `;
 
-type QueryBuilderContainerProps = {
-  apiUrl: string | null;
-  token: string | null;
-} & Pick<
+type QueryBuilderContainerProps = Pick<
   PlaygroundQueryBuilderProps,
   | 'defaultQuery'
   | 'initialVizState'
   | 'schemaVersion'
   | 'dashboardSource'
+  | 'extra'
   | 'onVizStateChanged'
   | 'onSchemaChange'
 > &
   Pick<QueryTabsProps, 'onTabChange'>;
 
-export function QueryBuilderContainer({
-  apiUrl,
-  token,
-  ...props
-}: QueryBuilderContainerProps) {
-  const { token: securityContextToken, setIsModalOpen } = useSecurityContext();
-
-  const currentToken = securityContextToken || token;
+export function QueryBuilderContainer(props: QueryBuilderContainerProps) {
+  const { apiUrl } = useAppContext();
+  const { currentToken, token: securityContextToken, setIsModalOpen } = useSecurityContext();
 
   useLayoutEffect(() => {
     if (apiUrl && currentToken) {
@@ -80,6 +72,8 @@ export function QueryBuilderContainer({
               dashboardSource={props.dashboardSource}
               securityContextToken={securityContextToken}
               onTabChange={props.onTabChange}
+              extra={props.extra}
+              onVizStateChanged={props.onVizStateChanged}
               onSecurityContextModalOpen={() => setIsModalOpen(true)}
             />
           </StyledCard>
@@ -96,7 +90,11 @@ type QueryTabsRendererProps = {
   onSecurityContextModalOpen: () => void;
 } & Pick<
   PlaygroundQueryBuilderProps,
-  'schemaVersion' | 'dashboardSource' | 'onVizStateChanged' | 'onSchemaChange'
+  | 'schemaVersion'
+  | 'dashboardSource'
+  | 'onVizStateChanged'
+  | 'onSchemaChange'
+  | 'extra'
 > &
   Pick<QueryTabsProps, 'onTabChange'>;
 
@@ -156,6 +154,7 @@ function QueryTabsRenderer({
           }}
           dashboardSource={dashboardSource}
           schemaVersion={schemaVersion}
+          extra={props.extra}
           onVizStateChanged={(vizState) => {
             saveTab({
               query: vizState.query || {},

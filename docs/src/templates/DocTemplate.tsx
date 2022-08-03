@@ -14,7 +14,7 @@ import last from 'lodash/last';
 import { renameCategory } from '../rename-category';
 
 import 'katex/dist/katex.min.css';
-import '../../static/styles/math.scss'
+import '../../static/styles/math.scss';
 
 import FeedbackBlock from '../components/FeedbackBlock';
 import ScrollLink, {
@@ -37,12 +37,15 @@ import {
 import { LoomVideo } from '../components/LoomVideo/LoomVideo';
 import { Grid } from '../components/Grid/Grid';
 import { GridItem } from '../components/Grid/GridItem';
-import ScrollSpyH2 from '../components/Headers/ScrollSpyH2'
+import ScrollSpyH2 from '../components/Headers/ScrollSpyH2';
 import ScrollSpyH3 from '../components/Headers/ScrollSpyH3';
 import MyH2 from '../components/Headers/MyH2';
 import MyH3 from '../components/Headers/MyH3';
+import { ParameterTable } from '../components/ReferenceDocs/ParameterTable';
 
-const MyH4 = (props) => <h4 name={kebabCase(props.id)} {...props} />;
+const MyH4: React.FC<{ children: string }> = ({ children }) => {
+  return (<h4 id={kebabCase(children)} name={kebabCase(children)}>{children}</h4>);
+}
 
 const components = {
   DangerBox,
@@ -55,6 +58,7 @@ const components = {
   GitHubCodeBlock,
   CubeQueryResultSet,
   GitHubFolderLink,
+  ParameterTable,
   h2: ScrollSpyH2,
   h3: ScrollSpyH3,
   h4: MyH4,
@@ -123,10 +127,16 @@ class DocTemplate extends Component<Props, State> {
       category: renameCategory(frontmatter.category),
       noscrollmenu: false,
     });
+
+    const hackFixFileAbsPath = this.props.pageContext.fileAbsolutePath.replace(
+      '/opt/build/repo/',
+      ''
+    );
+
     this.createAnchors(
       <MDXForSideMenu {...this.props} />,
       frontmatter.title,
-      getGithubUrl(this.props.pageContext.fileAbsolutePath)
+      getGithubUrl(hackFixFileAbsPath)
     );
   }
 
@@ -161,7 +171,7 @@ class DocTemplate extends Component<Props, State> {
     const rawNodes = ReactHtmlParser(stringElement);
     const sectionTags: Section[] = [
       {
-        id: 'top',
+        id: kebabCase(title),
         type: 'h1',
         className: styles.topSection,
         nodes: [
@@ -175,8 +185,8 @@ class DocTemplate extends Component<Props, State> {
       },
     ];
 
-    let currentParentID: string;
-    let currentID = 'top';
+    let currentParentID = kebabCase(title);
+    let currentID: string;
 
     rawNodes.forEach((item) => {
       let linkedHTag;
@@ -231,23 +241,22 @@ class DocTemplate extends Component<Props, State> {
           [styles.postClearSection]: isPreviousSectionClearable,
         });
 
-        // anchors like 'h2-h3'
+        currentID = kebabCase(item.props.children[0]);
+
         if (item.type === 'h2') {
           prevSection.className = cx(prevSection.className, {
             [styles.lastSection]: true,
             [styles.clearSection]: isPreviousSectionClearable,
           });
 
-          currentID = kebabCase(item.props.children[0]);
           currentParentID = currentID;
-        } else if (!!currentParentID) {
-          currentID = kebabCase(item.props.children[0]);
-        } else {
-          currentID = kebabCase(item.props.children[0]);
         }
 
         sectionTags.push({
-          id: currentID,
+          id:
+            currentParentID != currentID
+              ? `${currentParentID}-${currentID}`
+              : currentID,
           type: item.type,
           nodes: [],
           title: item.props.children[0],
@@ -288,10 +297,13 @@ class DocTemplate extends Component<Props, State> {
 
     return (
       <div>
-        <Helmet title={`${frontmatter.title} | Cube.js Docs`} />
+        <Helmet>
+          <title>{`${frontmatter.title} | Cube Docs`}</title>
+          <meta name="description" content={`${frontmatter.title} | Documentation for working with Cube, the open-source analytics framework`}></meta>
+        </Helmet>
         <div className={styles.docContentWrapper}>
           <div className={styles.docContent}>
-            <h1 name="top">{frontmatter.title}</h1>
+            <h1 id={kebabCase(frontmatter.title)}>{frontmatter.title}</h1>
             <MDX {...this.props} />
             {!isDisableFeedbackBlock && (
               <FeedbackBlock page={frontmatter.permalink} />

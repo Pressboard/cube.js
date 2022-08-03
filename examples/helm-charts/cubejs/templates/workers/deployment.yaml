@@ -23,10 +23,23 @@ spec:
       labels:
         app.kubernetes.io/component: workers
         {{- include "cubejs.selectorLabels" . | nindent 8 }}
+      {{- if .Values.commonAnnotations }}
+      annotations:
+      {{- toYaml .Values.commonAnnotations | nindent 8 }}
+      {{- end }}
     spec:
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: cube
-          image: "{{ .Values.image.repository }}:v{{ .Values.image.tag | default .Chart.AppVersion }}"
+          {{- if .Values.image.tag }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          {{- else }}
+          image: "{{ .Values.image.repository }}:v{{ .Chart.AppVersion }}"
+          {{- end }}
+          imagePullPolicy: {{ .Values.image.pullPolicy | quote }}
           ports:
             - name: http
               containerPort: {{ .Values.config.apiPort }}
@@ -74,6 +87,14 @@ spec:
       {{- if .Values.workers.affinity }}
       affinity:
         {{- toYaml .Values.workers.affinity | nindent 8 }}
+      {{- end }}
+      {{- if .Values.workers.tolerations }}
+      tolerations:
+        {{- toYaml .Values.workers.tolerations | nindent 8 }}
+      {{- end }}
+      {{- if .Values.workers.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.workers.nodeSelector | nindent 8 }}
       {{- end }}
       {{- if .Values.workers.spreadConstraints }}
       topologySpreadConstraints:

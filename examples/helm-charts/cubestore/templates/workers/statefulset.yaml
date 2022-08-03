@@ -24,10 +24,22 @@ spec:
       labels:
         app.kubernetes.io/component: workers
         {{- include "cubestore.selectorLabels" . | nindent 8 }}
+      {{- if .Values.commonAnnotations }}
+      annotations:
+      {{- toYaml .Values.commonAnnotations | nindent 8 }}
+      {{- end }}
     spec:
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: cubestore
-          image: "{{ .Values.image.repository }}:v{{ .Values.image.tag | default .Chart.AppVersion }}"
+          {{- if .Values.image.tag }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          {{- else }}
+          image: "{{ .Values.image.repository }}:v{{ .Chart.AppVersion }}"
+          {{- end }}
           imagePullPolicy: {{ .Values.image.pullPolicy | quote }}
           ports:
             - name: worker
@@ -56,10 +68,10 @@ spec:
               value: {{ printf "%s-router:%d" (include "cubestore.fullname" .) (.Values.router.metaPort | int) }}
             - name: CUBESTORE_DATA_DIR
               value: /cube/.cubestore/data
-            {{- if and (not .Values.cloudStorage.gcp.bucket) (not .Values.cloudStorage.aws.bucket) }}
+            {{- if and (not .Values.cloudStorage.gcp.bucket) (not .Values.cloudStorage.aws.bucket) (not .Values.cloudStorage.minio.bucket) }}
             - name: CUBESTORE_REMOTE_DIR
               value: /cube/data
-            {{- end}}
+            {{- end }}
           {{- if .Values.workers.resources }}
           resources:
             {{- toYaml .Values.workers.resources | nindent 12 }}
@@ -67,7 +79,7 @@ spec:
           volumeMounts: 
             - name: datadir
               mountPath: /cube/.cubestore/data
-            {{- if and (not .Values.cloudStorage.gcp.bucket) (not .Values.cloudStorage.aws.bucket) }}
+            {{- if and (not .Values.cloudStorage.gcp.bucket) (not .Values.cloudStorage.aws.bucket) (not .Values.cloudStorage.minio.bucket) }}
             - name: remotedir
               mountPath: /cube/data
             {{- end }}
@@ -80,7 +92,7 @@ spec:
         - name: datadir
           emptyDir: {}
       {{- end }}
-      {{- if and (not .Values.cloudStorage.gcp.bucket) (not .Values.cloudStorage.aws.bucket) }}
+      {{- if and (not .Values.cloudStorage.gcp.bucket) (not .Values.cloudStorage.aws.bucket) (not .Values.cloudStorage.minio.bucket) }}
         - name: remotedir
           persistentVolumeClaim:
             claimName: {{ printf "%s-remote-storage" (include "cubestore.fullname" .) }}
@@ -88,6 +100,14 @@ spec:
       {{- if .Values.workers.affinity }}
       affinity:
         {{- toYaml .Values.workers.affinity | nindent 8 }}
+      {{- end }}
+      {{- if .Values.workers.tolerations }}
+      tolerations:
+        {{- toYaml .Values.workers.tolerations | nindent 8 }}
+      {{- end }}
+      {{- if .Values.workers.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.workers.nodeSelector | nindent 8 }}
       {{- end }}
       {{- if .Values.workers.spreadConstraints }}
       topologySpreadConstraints:
@@ -112,5 +132,5 @@ spec:
         resources:
           requests:
             storage: {{ .Values.workers.persistence.size | quote }}
-  {{- end}}
-{{- end}}
+  {{- end }}
+{{- end }}

@@ -130,8 +130,10 @@ interface SnowflakeDriverOptions {
   authenticator?: string,
   privateKeyPath?: string,
   privateKeyPass?: string,
+  privateKey?: string,
   resultPrefetch?: number,
   exportBucket?: SnowflakeDriverExportBucket,
+  executionTimeout?: number,
 }
 
 /**
@@ -140,6 +142,13 @@ interface SnowflakeDriverOptions {
  * Similar to data in response, column_name will be COLUMN_NAME
  */
 export class SnowflakeDriver extends BaseDriver implements DriverInterface {
+  /**
+   * Returns default concurrency value.
+   */
+  public static getDefaultConcurrency(): number {
+    return 5;
+  }
+
   protected connection: Promise<Connection> | null = null;
 
   protected readonly config: SnowflakeDriverOptions;
@@ -147,6 +156,10 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   public constructor(config: Partial<SnowflakeDriverOptions> = {}) {
     super();
 
+    let privateKey = process.env.CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY;
+    if (privateKey && !privateKey.endsWith('\n')) {
+      privateKey += '\n';
+    }
     this.config = {
       account: <string>process.env.CUBEJS_DB_SNOWFLAKE_ACCOUNT,
       region: process.env.CUBEJS_DB_SNOWFLAKE_REGION,
@@ -159,8 +172,10 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       authenticator: process.env.CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR,
       privateKeyPath: process.env.CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PATH,
       privateKeyPass: process.env.CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS,
+      privateKey,
       exportBucket: this.getExportBucket(),
       resultPrefetch: 1,
+      executionTimeout: getEnv('dbQueryTimeout'),
       ...config
     };
   }
@@ -233,7 +248,18 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   }
 
   public async testConnection() {
-    await this.query('SELECT 1 as number');
+    const connection = snowflake.createConnection(this.config);
+    await new Promise(
+      (resolve, reject) => connection.connect((err, conn) => (err ? reject(err) : resolve(conn)))
+    );
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password, ...rest } = this.config;
+    if (!connection.isUp()) {
+      throw new Error(`Can't connect to the Snowflake instance: ${JSON.stringify(rest)}`);
+    }
+    await new Promise(
+      (resolve, reject) => connection.destroy((err, conn) => (err ? reject(err) : resolve(conn)))
+    );
   }
 
   protected async initConnection() {
@@ -244,7 +270,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       );
 
       await this.execute(connection, 'ALTER SESSION SET TIMEZONE = \'UTC\'', [], false);
-      await this.execute(connection, 'ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS = 600', [], false);
+      await this.execute(connection, `ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS = ${this.config.executionTimeout}`, [], false);
 
       return connection;
     } catch (e) {
@@ -522,7 +548,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
         SELECT COLUMNS.COLUMN_NAME as "column_name",
                COLUMNS.TABLE_NAME as "table_name",
                COLUMNS.TABLE_SCHEMA as "table_schema",
-               COLUMNS.DATA_TYPE as "data_type"
+               CASE WHEN COLUMNS.NUMERIC_SCALE = 0 AND COLUMNS.DATA_TYPE = 'NUMBER' THEN 'int' ELSE COLUMNS.DATA_TYPE END as "data_type"
         FROM INFORMATION_SCHEMA.COLUMNS
         WHERE COLUMNS.TABLE_SCHEMA NOT IN ('INFORMATION_SCHEMA')
      `;
@@ -545,7 +571,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
     const columns = await this.query<{ COLUMN_NAME: string, DATA_TYPE: string }[]>(
       `SELECT COLUMNS.COLUMN_NAME,
-             COLUMNS.DATA_TYPE
+             CASE WHEN COLUMNS.NUMERIC_SCALE = 0 AND COLUMNS.DATA_TYPE = 'NUMBER' THEN 'int' ELSE COLUMNS.DATA_TYPE END as DATA_TYPE
       FROM INFORMATION_SCHEMA.COLUMNS
       WHERE TABLE_NAME = ${this.param(0)} AND TABLE_SCHEMA = ${this.param(1)}
       ORDER BY ORDINAL_POSITION`,

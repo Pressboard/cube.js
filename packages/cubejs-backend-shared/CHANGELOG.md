@@ -3,6 +3,279 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.43](https://github.com/cube-js/cube.js/compare/v0.30.42...v0.30.43) (2022-07-28)
+
+
+### Features
+
+* **cubesql:** Security Context switching (Row Access) ([731e1ab](https://github.com/cube-js/cube.js/commit/731e1ab6d9362fb9a1857f5276e22a565f79781c))
+* **databricks-jdbc:** UserAgentEntry property configuration for the databricks-jdbc driver ([bccae12](https://github.com/cube-js/cube.js/commit/bccae12715fcbfdecbc2175de5e4ad6601ba374f))
+
+
+
+
+
+## [0.30.34](https://github.com/cube-js/cube.js/compare/v0.30.33...v0.30.34) (2022-07-12)
+
+
+### Features
+
+* **server-core:** pre-aggregations building by API instances only if CUBEJS_PRE_AGGREGATIONS_BUILDER is set ([a203513](https://github.com/cube-js/cube.js/commit/a203513666bb36c7f45e25fdf24908bf6d44ac3d))
+
+
+
+
+
+## [0.30.30](https://github.com/cube-js/cube.js/compare/v0.30.29...v0.30.30) (2022-07-05)
+
+
+### Features
+
+* centralized concurrency setting ([#4735](https://github.com/cube-js/cube.js/issues/4735)) ([1c897a1](https://github.com/cube-js/cube.js/commit/1c897a13c62049e23d26009351622b2a93c0a745))
+
+
+
+
+
+## [0.30.25](https://github.com/cube-js/cube.js/compare/v0.30.24...v0.30.25) (2022-06-16)
+
+
+### Bug Fixes
+
+* **databricks-jdbc:** communication link failure ([9c3577d](https://github.com/cube-js/cube.js/commit/9c3577d4935d355b4de79c3d84771e591ada8ec2))
+
+
+
+
+
+## [0.30.20](https://github.com/cube-js/cube.js/compare/v0.30.19...v0.30.20) (2022-06-11)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+
+
+
+
+## [0.30.7](https://github.com/cube-js/cube.js/compare/v0.30.6...v0.30.7) (2022-05-26)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+
+
+
+
+## [0.30.6](https://github.com/cube-js/cube.js/compare/v0.30.5...v0.30.6) (2022-05-24)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+
+
+
+
+## [0.30.1](https://github.com/cube-js/cube.js/compare/v0.30.0...v0.30.1) (2022-05-14)
+
+
+### Features
+
+* **cubesql:** Add CUBEJS_PG_SQL_PORT env support and SQL API reference docs ([#4531](https://github.com/cube-js/cube.js/issues/4531)) ([de60d71](https://github.com/cube-js/cube.js/commit/de60d71c360be47e3231e7eafa349b9a0fddd244))
+
+
+
+
+
+# [0.30.0](https://github.com/cube-js/cube.js/compare/v0.29.57...v0.30.0) (2022-05-11)
+
+
+### Features
+
+* **streamlined-config:** CUBEJS_EXTERNAL_DEFAULT and CUBEJS_SCHEDULED_REFRESH_DEFAULT defaults changed to "true" ([#4367](https://github.com/cube-js/cube.js/issues/4367)) ([d52adaf](https://github.com/cube-js/cube.js/commit/d52adaf9d7e95d9892348c8a2fbc971c4652dae3))
+
+
+
+
+
+## [0.29.51](https://github.com/cube-js/cube.js/compare/v0.29.50...v0.29.51) (2022-04-22)
+
+
+### Features
+
+* **databricks-driver:** Export bucket support for S3/Azure ([#4430](https://github.com/cube-js/cube.js/issues/4430)) ([4512126](https://github.com/cube-js/cube.js/commit/4512126346fd2650fdcba3936ed1eb129b34af9d))
+
+
+
+
+
+## [0.29.48](https://github.com/cube-js/cube.js/compare/v0.29.47...v0.29.48) (2022-04-14)
+
+
+### Features
+
+* **query-language:** "total" flag support ([#4134](https://github.com/cube-js/cube.js/issues/4134)) ([51aef5e](https://github.com/cube-js/cube.js/commit/51aef5ede6e9b0c0e0e8749119e98102f168b8ca))
+
+
+
+
+
+## [0.29.37](https://github.com/cube-js/cube.js/compare/v0.29.36...v0.29.37) (2022-03-29)
+
+
+### Features
+
+* Introduce `CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY` env ([#2941](https://github.com/cube-js/cube.js/issues/2941)) Thanks [@vignesh-123](https://github.com/vignesh-123) ! ([fa829bf](https://github.com/cube-js/cube.js/commit/fa829bf6446279e37c5aee75ceb914d274cba974))
+
+
+
+
+
+## [0.29.33](https://github.com/cube-js/cube.js/compare/v0.29.32...v0.29.33) (2022-03-17)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+
+
+
+
+## [0.29.29](https://github.com/cube-js/cube.js/compare/v0.29.28...v0.29.29) (2022-03-03)
+
+
+### Bug Fixes
+
+* Timestamp for quarter range in time series has incorrect ending period of 23:59:99  ([#4162](https://github.com/cube-js/cube.js/issues/4162)) Thanks @Yashkochar20 ! ([8e27ae7](https://github.com/cube-js/cube.js/commit/8e27ae73bcb4c8524690122779f2d9e5f1ba7c12))
+
+
+
+
+
+## [0.29.28](https://github.com/cube-js/cube.js/compare/v0.29.27...v0.29.28) (2022-02-10)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/athena-driver:** Batching and export support ([#4039](https://github.com/cube-js/cube.js/issues/4039)) ([108f42a](https://github.com/cube-js/cube.js/commit/108f42afdd58ae0027b1b81730f7ca9e72ab9122))
+
+
+
+
+
+## [0.29.23](https://github.com/cube-js/cube.js/compare/v0.29.22...v0.29.23) (2022-01-26)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+
+
+
+
+## [0.29.21](https://github.com/cube-js/cube.js/compare/v0.29.20...v0.29.21) (2022-01-17)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+
+
+
+
+## [0.29.20](https://github.com/cube-js/cube.js/compare/v0.29.19...v0.29.20) (2022-01-10)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+
+
+
+
+## [0.29.18](https://github.com/cube-js/cube.js/compare/v0.29.17...v0.29.18) (2022-01-09)
+
+
+### Bug Fixes
+
+* Try to fix Zalgo bug https://github.com/Marak/colors.js/issues/285 ([796c404](https://github.com/cube-js/cube.js/commit/796c4040be5f37d39b519b33fa36c61e3c1b0707))
+
+
+
+
+
+## [0.29.15](https://github.com/cube-js/cube.js/compare/v0.29.14...v0.29.15) (2021-12-30)
+
+
+### Features
+
+* Introduce single unified CUBEJS_DB_QUERY_TIMEOUT env variable to set all various variables that control database query timeouts ([#3864](https://github.com/cube-js/cube.js/issues/3864)) ([33c6292](https://github.com/cube-js/cube.js/commit/33c6292059e65e293a7e3d61e1f1e0c1413eeece))
+
+
+
+
+
+## [0.29.12](https://github.com/cube-js/cube.js/compare/v0.29.11...v0.29.12) (2021-12-29)
+
+
+### Features
+
+* Split batching upload of pre-aggregations into multiple files to enhance performance and avoid load balancer upload limits ([#3857](https://github.com/cube-js/cube.js/issues/3857)) ([6f71419](https://github.com/cube-js/cube.js/commit/6f71419b1c921a0d4e39231370b181d390b01f3d))
+
+
+
+
+
+# [0.29.0](https://github.com/cube-js/cube.js/compare/v0.28.67...v0.29.0) (2021-12-14)
+
+
+### Reverts
+
+* Revert "BREAKING CHANGE: 0.29 (#3809)" (#3811) ([db005ed](https://github.com/cube-js/cube.js/commit/db005edc04d48e8251250ab9d0e19f496cf3b52b)), closes [#3809](https://github.com/cube-js/cube.js/issues/3809) [#3811](https://github.com/cube-js/cube.js/issues/3811)
+
+
+* BREAKING CHANGE: 0.29 (#3809) ([6f1418b](https://github.com/cube-js/cube.js/commit/6f1418b9963774844f341682e594601a56bb0084)), closes [#3809](https://github.com/cube-js/cube.js/issues/3809)
+
+
+### BREAKING CHANGES
+
+* Drop support for Node.js 10 (12.x is a minimal version)
+* Upgrade Node.js to 14 for Docker images
+* Drop support for Node.js 15
+
+
+
+
+
+## [0.28.55](https://github.com/cube-js/cube.js/compare/v0.28.54...v0.28.55) (2021-11-12)
+
+
+### Features
+
+* Introduce checkSqlAuth (auth hook for SQL API) ([3191b73](https://github.com/cube-js/cube.js/commit/3191b73816cd63d242349041c54a7037e9027c1a))
+
+
+
+
+
+## [0.28.52](https://github.com/cube-js/cube.js/compare/v0.28.51...v0.28.52) (2021-11-03)
+
+
+### Bug Fixes
+
+* Empty data partitioned pre-aggregations are incorrectly handled -- value provided is not in a recognized RFC2822 or ISO format ([9f3acd5](https://github.com/cube-js/cube.js/commit/9f3acd572bcd2421bf8d3581c4c6287b62e77313))
+
+
+
+
+
+## [0.28.50](https://github.com/cube-js/cube.js/compare/v0.28.49...v0.28.50) (2021-10-28)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+
+
+
+
+## [0.28.42](https://github.com/cube-js/cube.js/compare/v0.28.41...v0.28.42) (2021-10-15)
+
+
+### Features
+
+* Integrate SQL Connector to Cube.js ([#3544](https://github.com/cube-js/cube.js/issues/3544)) ([f90de4c](https://github.com/cube-js/cube.js/commit/f90de4c9283178962f501826a8a64abb674c37d1))
+
+
+
+
+
 ## [0.28.29](https://github.com/cube-js/cube.js/compare/v0.28.28...v0.28.29) (2021-08-31)
 
 

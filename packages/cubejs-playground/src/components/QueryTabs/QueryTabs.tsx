@@ -1,7 +1,7 @@
-import { ChartType, PivotConfig, Query } from '@cubejs-client/core';
+import { ChartType, PivotConfig, Query, validateQuery } from '@cubejs-client/core';
 import { Tabs } from 'antd';
 import equals from 'fast-deep-equal';
-import { ReactNode, useEffect, useLayoutEffect, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import styled from 'styled-components';
 
 import { event } from '../../events';
@@ -35,6 +35,11 @@ type QueryTabs = {
   tabs: QueryTab[];
 };
 
+type DrillDownConfig = {
+  query?: Query | null;
+  pivotConfig?: PivotConfig | null;
+};
+
 export type QueryTabsProps = {
   query: Query | null;
   children: (
@@ -60,6 +65,7 @@ export function QueryTabs({
     setBuildInProgress,
     setSlowQuery,
     setSlowQueryFromCache,
+    setQueryRequestId,
   } = useChartRendererStateMethods();
 
   const [ready, setReady] = useState<boolean>(false);
@@ -73,10 +79,7 @@ export function QueryTabs({
     ],
   });
 
-  const [drilldownConfig, setDrilldownConfig] = useState<{
-    query?: Query | null;
-    pivotConfig?: PivotConfig | null;
-  }>({});
+  const [drilldownConfig, setDrilldownConfig] = useState<DrillDownConfig>({});
 
   useEffect(() => {
     window['__cubejsPlayground'] = {
@@ -95,11 +98,16 @@ export function QueryTabs({
             if (resultSet) {
               const { loadResponse } = resultSet.serialize();
               const {
+                requestId,
                 external,
                 dbType,
                 extDbType,
                 usedPreAggregations = {},
               } = loadResponse.results[0] || {};
+
+              if (requestId) {
+                setQueryRequestId(queryId, requestId);
+              }
 
               setSlowQueryFromCache(queryId, Boolean(loadResponse.slowQuery));
               Boolean(loadResponse.slowQuery) && setSlowQuery(queryId, false);
@@ -179,7 +187,7 @@ export function QueryTabs({
       (tab) => tab.id === queryTabs.activeId
     );
 
-    if (query && !equals(currentTab?.query, query)) {
+    if (query && !equals(validateQuery(currentTab?.query), validateQuery(query))) {
       const id = getNextId();
 
       saveTabs({

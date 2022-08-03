@@ -5,6 +5,7 @@ import CubeCore, {
   CubejsServerCore,
   DatabaseType,
   DriverContext,
+  DriverOptions,
   SystemOptions
 } from '@cubejs-backend/server-core';
 import { getEnv, withTimeout } from '@cubejs-backend/shared';
@@ -14,6 +15,7 @@ import util from 'util';
 import bodyParser from 'body-parser';
 import cors, { CorsOptions } from 'cors';
 
+import type { SQLServer, SQLServerOptions } from '@cubejs-backend/api-gateway';
 import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
 
 import { WebSocketServer, WebSocketServerOptions } from './websocket-server';
@@ -33,7 +35,7 @@ interface HttpOptions {
   cors?: CorsOptions;
 }
 
-export interface CreateOptions extends CoreCreateOptions, WebSocketServerOptions {
+export interface CreateOptions extends CoreCreateOptions, WebSocketServerOptions, SQLServerOptions {
   webSockets?: boolean;
   initApp?: InitAppFn;
   http?: HttpOptions;
@@ -49,11 +51,13 @@ type RequireOne<T, K extends keyof T> = {
 export class CubejsServer {
   protected readonly core: CubejsServerCore;
 
-  protected readonly config: RequireOne<CreateOptions, 'webSockets' | 'http'>;
+  protected readonly config: RequireOne<CreateOptions, 'webSockets' | 'http' | 'sqlPort' | 'pgSqlPort'>;
 
   protected server: GracefulHttpServer | null = null;
 
   protected socketServer: WebSocketServer | null = null;
+
+  protected sqlServer: SQLServer | null = null;
 
   protected readonly status: ServerStatusHandler = new ServerStatusHandler();
 
@@ -61,6 +65,9 @@ export class CubejsServer {
     this.config = {
       ...config,
       webSockets: config.webSockets || getEnv('webSockets'),
+      sqlPort: config.sqlPort || getEnv('sqlPort'),
+      pgSqlPort: config.pgSqlPort || getEnv('pgSqlPort'),
+      sqlNonce: config.sqlNonce || getEnv('sqlNonce'),
       http: {
         ...config.http,
         cors: {
@@ -104,6 +111,11 @@ export class CubejsServer {
       if (this.config.webSockets) {
         this.socketServer = new WebSocketServer(this.core, this.config);
         this.socketServer.initServer(this.server);
+      }
+
+      if (this.config.sqlPort || this.config.pgSqlPort) {
+        this.sqlServer = this.core.initSQLServer();
+        await this.sqlServer.init(this.config);
       }
 
       const PORT = getEnv('port');
@@ -151,6 +163,10 @@ export class CubejsServer {
         await this.socketServer.close();
       }
 
+      if (this.sqlServer) {
+        await this.sqlServer.close();
+      }
+
       if (!this.server) {
         throw new Error('CubeServer is not started.');
       }
@@ -170,8 +186,8 @@ export class CubejsServer {
     }
   }
 
-  public static createDriver(dbType: DatabaseType) {
-    return CubeCore.createDriver(dbType);
+  public static createDriver(dbType: DatabaseType, opt: DriverOptions) {
+    return CubeCore.createDriver(dbType, opt);
   }
 
   public static driverDependencies(dbType: DatabaseType) {

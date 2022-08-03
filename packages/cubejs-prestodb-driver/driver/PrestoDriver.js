@@ -6,6 +6,13 @@ const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
 const SqlString = require('sqlstring');
 
 class PrestoDriver extends BaseDriver {
+  /**
+   * Returns default concurrency value.
+   */
+  static getDefaultConcurrency() {
+    return 2;
+  }
+
   constructor(config) {
     super();
 
@@ -19,6 +26,7 @@ class PrestoDriver extends BaseDriver {
         user: process.env.CUBEJS_DB_USER,
         password: process.env.CUBEJS_DB_PASS
       } : undefined,
+      ssl: this.getSslOptions(),
       ...config
     };
 

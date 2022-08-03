@@ -3,7 +3,7 @@ title: Serverless Framework on AWS
 permalink: /deployment/platforms/serverless/aws
 category: Deployment
 subCategory: Platforms
-menuOrder: 3
+menuOrder: 4
 ---
 
 This guide walks you through deploying Cube.js with the [Serverless
@@ -11,10 +11,13 @@ Framework][link-sls] on [AWS][link-aws].
 
 <WarningBox>
 
-This is an example of a production-ready deployment, but real-world deployments
-require extra configuration to enable scheduled refreshes. Cube Store **cannot**
-be deployed using Serverless platforms. For a "serverless" experience, we highly
-recommend using [Cube Cloud][link-cube-cloud]
+<b>WARNING!</b>
+
+We do not recommend deploying Cube with AWS Lambda, AWS Fargate and
+Google Cloud Functions. This guide will be removed soon. Additionally, please
+note that Cube Store [will replace Redis for in-memory caching and queue management in
+late 2022](https://cube.dev/blog/replacing-redis-with-cube-store) and will be a
+required component to run clustered Cube deployments.
 
 </WarningBox>
 
@@ -148,9 +151,10 @@ relevant options on our Cube.js API instance:
 
 <WarningBox>
 
-If you have cubes that use `SECURITY_CONTEXT` in their `sql` property, then you
-must configure [`scheduledRefreshContexts`][ref-config-sched-ref-ctx] so the
-refresh workers can correctly create pre-aggregations.
+If you're using [`queryRewrite`][ref-config-queryrewrite] for access control,
+then you must also configure
+[`scheduledRefreshContexts`][ref-config-sched-ref-ctx] so the refresh workers
+can correctly create pre-aggregations.
 
 </WarningBox>
 
@@ -198,5 +202,6 @@ npm][link-cubejs-sls-npm]. Then update your `package.json` to use the version:
 [link-cubejs-sls-npm]: https://www.npmjs.com/package/@cubejs-backend/serverless
 [link-docker-app]: https://www.docker.com/products/docker-app
 [ref-caching-prod]: /caching/running-in-production
+[ref-config-queryrewrite]: /config#query-rewrite
 [ref-config-sched-ref-ctx]: /config#scheduled-refresh-contexts
 [ref-restapi-sched-refresh]: /rest-api#v-1-run-scheduled-refresh

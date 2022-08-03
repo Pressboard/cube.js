@@ -21,7 +21,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/angular-dashboard-with-material-ui/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/angular-dashboard-with-material-ui/*,examples/angular-dashboard-with-material-ui/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -33,7 +33,7 @@ jobs:
         env:
           EXAMPLE_SLUG: angular-dashboard-with-material-ui
           EXAMPLE_FRONTEND_BUILD_SUBDIRECTORY: dist/dashboard-app
-          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH_ANGULAR_DASHBOARD }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
   compare-date-range:
@@ -46,7 +46,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/compare-date-range/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/compare-date-range/*,examples/compare-date-range/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -57,7 +57,7 @@ jobs:
         run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: compare-date-range
-          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH_DATA_RANGE }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
   clickhouse-dashboard:
@@ -70,7 +70,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/clickhouse-dashboard/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/clickhouse-dashboard/*,examples/clickhouse-dashboard/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -81,7 +81,7 @@ jobs:
         run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: clickhouse-dashboard
-          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH_CLICKHOUSE_DASHBOARD }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
   d3-dashboard:
@@ -94,7 +94,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/d3-dashboard/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/d3-dashboard/*,examples/d3-dashboard/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -105,7 +105,7 @@ jobs:
         run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: d3-dashboard
-          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH_D3_DASHBOARD }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
   data-blending:
@@ -118,7 +118,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/data-blending/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/data-blending/*,examples/data-blending/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -129,7 +129,7 @@ jobs:
         run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: data-blending
-          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH_DATA_BLENDING }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
   drill-downs:
@@ -142,7 +142,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/drill-downs/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/drill-downs/*,examples/drill-downs/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -153,7 +153,7 @@ jobs:
         run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: drill-downs
-          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH_DRILL_DOWNS }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
   ecom-backend:
@@ -166,7 +166,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/ecom-backend/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/ecom-backend/*,examples/ecom-backend/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -178,7 +178,7 @@ jobs:
         env:
           EXAMPLE_SLUG: ecom-backend
           EXAMPLE_FRONTEND_SKIP: 1
-          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH_ECOM_BACKEND }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
   external-rollups:
@@ -191,7 +191,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/external-rollups/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/external-rollups/*,examples/external-rollups/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -202,7 +202,7 @@ jobs:
         run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: external-rollups
-          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH_EXTERNAL_ROLLUPS }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
   hacktoberfest:
@@ -215,7 +215,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/hacktoberfest/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/hacktoberfest/*,examples/hacktoberfest/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -227,7 +227,7 @@ jobs:
         env:
           EXAMPLE_SLUG: hacktoberfest
           EXAMPLE_FRONTEND_SUBDIRECTORY: dashboard
-          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH_HACKTOBERFEST }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
   highcharts:
@@ -240,7 +240,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/highcharts/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/highcharts/*,examples/highcharts/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -251,7 +251,7 @@ jobs:
         run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: highcharts
-          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH_HIGHCHARTS }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
   mapbox:
@@ -264,7 +264,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/mapbox/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/mapbox/*,examples/mapbox/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -275,7 +275,7 @@ jobs:
         run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: mapbox
-          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH_MAPBOX }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
   material-ui-dashboard:
@@ -288,7 +288,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/material-ui-dashboard/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/material-ui-dashboard/*,examples/material-ui-dashboard/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -299,7 +299,7 @@ jobs:
         run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: material-ui-dashboard
-          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH_MATERIAL_UI_DASHBOARD }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
   react-dashboard:
@@ -312,7 +312,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/react-dashboard/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/react-dashboard/*,examples/react-dashboard/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -323,7 +323,7 @@ jobs:
         run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: react-dashboard
-          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH_REACT_DASHBOARD }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
   react-data-table:
@@ -336,7 +336,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/react-data-table/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/react-data-table/*,examples/react-data-table/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -347,7 +347,7 @@ jobs:
         run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: react-data-table
-          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH_REACT_DATA_TABLE }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
   react-muze:
@@ -360,7 +360,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/react-muze/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/react-muze/*,examples/react-muze/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -371,7 +371,7 @@ jobs:
         run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: react-muze
-          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH_REACT_MUZE }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
   real-time-dashboard:
@@ -384,7 +384,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/real-time-dashboard/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/real-time-dashboard/*,examples/real-time-dashboard/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -395,7 +395,7 @@ jobs:
         run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: real-time-dashboard
-          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH_REAL_TIME_DASHBOARD }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
   vue-query-builder:
@@ -408,7 +408,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/vue-query-builder/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/vue-query-builder/*,examples/vue-query-builder/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -419,8 +419,8 @@ jobs:
         run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: vue-query-builder
-          EXAMPLE_FRONTEND_BUILD_SUBDIRECTORY: dist
-          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+          EXAMPLE_FRONTEND_BUILD_SUBDIRECTORY: dist/
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH_VUE_QUERY_BUILDER }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
   web-analytics:
@@ -433,7 +433,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/web-analytics/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/web-analytics/*,examples/web-analytics/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -444,7 +444,7 @@ jobs:
         run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: web-analytics
-          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH_WEB_ANALYTICS }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
   auth0:
@@ -457,7 +457,7 @@ jobs:
       - uses: pheel/path-watcher-action@v1
         id: modified
         with:
-          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/auth0/**'
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/auth0/*,examples/auth0/**'
 
       - if: steps.modified.outputs.modified
         uses: actions/setup-node@v1
@@ -468,5 +468,252 @@ jobs:
         run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: auth0
-          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH_AUTH0 }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
+  bigquery-public-datasets:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/bigquery-public-datasets/*,examples/bigquery-public-datasets/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
+        env:
+          EXAMPLE_SLUG: bigquery-public-datasets
+          EXAMPLE_CUBE_SKIP: 1
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
+  google-charts-moma:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/google-charts-moma/*,examples/google-charts-moma/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
+        env:
+          EXAMPLE_SLUG: google-charts-moma
+          EXAMPLE_CUBE_SKIP: 1
+          EXAMPLE_FRONTEND_BUILD_SUBDIRECTORY: public/
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
+  deepnote:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/deepnote/*,examples/deepnote/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
+        env:
+          EXAMPLE_SLUG: deepnote
+          EXAMPLE_CUBE_SKIP: 1
+          EXAMPLE_FRONTEND_BUILD_SUBDIRECTORY: dist/
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          EXAMPLE_FRONTEND_SUBDIRECTORY: './'
+
+  graphql-api-metrics-dashboard:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/graphql-api-metrics-dashboard/*,examples/graphql-api-metrics-dashboard/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
+        env:
+          EXAMPLE_SLUG: graphql-api-metrics-dashboard
+          EXAMPLE_CUBE_SKIP: 1
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          EXAMPLE_FRONTEND_SUBDIRECTORY: './'
+
+  multi-tenant-analytics:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/multi-tenant-analytics/*,examples/multi-tenant-analytics/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
+        env:
+          EXAMPLE_SLUG: multi-tenant-analytics
+          EXAMPLE_CUBE_SKIP: 1
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
+  react-pivot-table:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/react-pivot-table/*,examples/react-pivot-table/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
+        env:
+          EXAMPLE_SLUG: react-pivot-table
+          EXAMPLE_CUBE_SKIP: 1
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
+  slack-vibe:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/slack-vibe/*,examples/slack-vibe/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
+        env:
+          EXAMPLE_SLUG: slack-vibe
+          EXAMPLE_CUBE_SKIP: 1
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          EXAMPLE_FRONTEND_SUBDIRECTORY: 'frontend'
+
+  multitenancy-workshop:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/multitenancy-workshop/*,examples/multitenancy-workshop/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
+        env:
+          EXAMPLE_SLUG: multitenancy-workshop
+          EXAMPLE_CUBE_SKIP: 1
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+  
+  aws-web-analytics:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/aws-web-analytics/*,examples/aws-web-analytics/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
+        env:
+          EXAMPLE_SLUG: aws-web-analytics
+          EXAMPLE_CUBE_SKIP: 1
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          EXAMPLE_FRONTEND_SUBDIRECTORY: 'analytics-dashboard'
+  
+  event-analytics:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/event-analytics/*,examples/event-analytics/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
+        env:
+          EXAMPLE_SLUG: event-analytics
+          EXAMPLE_CUBE_SKIP: 1
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          EXAMPLE_FRONTEND_SUBDIRECTORY: 'frontend'

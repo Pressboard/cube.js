@@ -9,6 +9,7 @@ module.exports = {
   bigquery: '@cubejs-backend/bigquery-driver',
   redshift: '@cubejs-backend/redshift-driver',
   clickhouse: '@cubejs-backend/clickhouse-driver',
+  firebolt: '@cubejs-backend/firebolt-driver',
   hive: '@cubejs-backend/hive-driver',
   snowflake: '@cubejs-backend/snowflake-driver',
   prestodb: '@cubejs-backend/prestodb-driver',
@@ -19,6 +20,9 @@ module.exports = {
   dremio: '@cubejs-backend/dremio-driver',
   druid: '@cubejs-backend/druid-driver',
   cubestore: '@cubejs-backend/cubestore-driver',
+  ksql: '@cubejs-backend/ksql-driver',
+  questdb: '@cubejs-backend/questdb-driver',
+  materialize: '@cubejs-backend/materialize-driver',
   // List for JDBC drivers
   'databricks-jdbc': '@cubejs-backend/databricks-jdbc-driver',
 };

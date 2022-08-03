@@ -20,13 +20,16 @@ export class CubeEvaluator extends CubeSymbols {
 
     this.evaluatedCubes = R.fromPairs(validCubes.map(v => [v.name, v]));
     this.byFileName = R.groupBy(v => v.fileName, validCubes);
-    this.primaryKeys = R.fromPairs(validCubes.map((v) => {
-      const primaryKeyNameToSymbol = R.compose(R.find(d => d[1].primaryKey), R.toPairs)(v.dimensions || {});
-      return [
-        v.name,
-        primaryKeyNameToSymbol && primaryKeyNameToSymbol[0]
-      ];
-    }));
+    this.primaryKeys = R.fromPairs(
+      validCubes.map((v) => {
+        const primaryKeyNamesToSymbols = R.compose(
+          R.map((d) => d[0]),
+          R.filter((d) => d[1].primaryKey),
+          R.toPairs
+        )(v.dimensions || {});
+        return [v.name, primaryKeyNamesToSymbols];
+      })
+    );
   }
 
   /**
@@ -116,27 +119,25 @@ export class CubeEvaluator extends CubeSymbols {
         const preAggregations = this.preAggregationsForCube(cube);
         return Object.keys(preAggregations)
           .filter(
-            preAggregationName => (!scheduled || preAggregations[preAggregationName].scheduledRefresh) &&
-              (!preAggregationIds || preAggregationIds.includes(idFactory({ cube, preAggregationName })))
+            preAggregationName => (
+              !scheduled ||
+              preAggregations[preAggregationName].scheduledRefresh
+            ) && (
+              !preAggregationIds ||
+              preAggregationIds.includes(idFactory({
+                cube, preAggregationName
+              }))
+            )
           )
           .map(preAggregationName => {
-            const { indexes, refreshRangeStart, refreshRangeEnd, refreshKey } = preAggregations[preAggregationName];
+            const { indexes, refreshKey } = preAggregations[preAggregationName];
             return {
               id: idFactory({ cube, preAggregationName }),
               preAggregationName,
               preAggregation: preAggregations[preAggregationName],
               cube,
               references: this.evaluatePreAggregationReferences(cube, preAggregations[preAggregationName]),
-              refreshRangeReferences: {
-                refreshRangeStart: refreshRangeStart && refreshRangeStart.sql && { sql: refreshRangeStart.sql() },
-                refreshRangeEnd: refreshRangeEnd && refreshRangeEnd.sql && { sql: refreshRangeEnd.sql() }
-              },
-              refreshKeyReferences: {
-                refreshKey: refreshKey && {
-                  ...refreshKey,
-                  sql: refreshKey && refreshKey.sql && refreshKey.sql()
-                }
-              },
+              refreshKey,
               indexesReferences: indexes && Object.keys(indexes).reduce((obj, indexName) => {
                 obj[indexName] = {
                   columns: this.evaluateReferences(
@@ -276,6 +277,7 @@ export class CubeEvaluator extends CubeSymbols {
       granularity: aggregation.granularity
     }] : [];
     return {
+      allowNonStrictDateRangeMatch: aggregation.allowNonStrictDateRangeMatch,
       dimensions:
         (aggregation.dimensionReferences && this.evaluateReferences(cube, aggregation.dimensionReferences) || [])
           .concat(

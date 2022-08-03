@@ -23,7 +23,7 @@ export const TIME_SERIES: { [key: string]: (range: DateRange) => QueryDateRange[
   week: (range: DateRange) => Array.from(range.snapTo(<unitOfTime.Diff>'isoWeek').by('week'))
     .map(d => [d.startOf('isoWeek').format('YYYY-MM-DDT00:00:00.000'), d.endOf('isoWeek').format('YYYY-MM-DDT23:59:59.999')]),
   quarter: (range: DateRange) => Array.from(range.snapTo('quarter').by('quarter'))
-    .map(d => [d.format('YYYY-MM-DDT00:00:00.000'), d.endOf('quarter').format('YYYY-MM-DDT23:59:99.999')]),
+    .map(d => [d.format('YYYY-MM-DDT00:00:00.000'), d.endOf('quarter').format('YYYY-MM-DDT23:59:59.999')]),
 };
 
 export const timeSeries = (granularity: string, dateRange: QueryDateRange): QueryDateRange[] => {
@@ -85,7 +85,11 @@ export const utcToLocalTimeZone = (timezone: string, timestampFormat: string, ti
 
 export const extractDate = (data: any): string => {
   data = JSON.parse(JSON.stringify(data));
-  return moment.tz(data[0] && data[0][Object.keys(data[0])[0]], 'UTC').utc().format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
+  const value = data[0] && data[0][Object.keys(data[0])[0]];
+  if (!value) {
+    return value;
+  }
+  return moment.tz(value, 'UTC').utc().format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
 };
 
 export const addSecondsToLocalTimestamp = (timestamp: string, timezone: string, seconds: number): Date => {

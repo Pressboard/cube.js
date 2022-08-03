@@ -1,7 +1,7 @@
 import React from 'react';
 import { Table } from 'antd';
 
-import useDeepMemo from '../../hooks/deep-memo';
+import { useDeepMemo } from '../../hooks/deep-memo';
 
 const TABLE_PAGE_SIZE = 50;
 
@@ -26,7 +26,13 @@ const formatTableData = (columns, data) => {
     }
 
     if (type === 'boolean') {
-      return Boolean(value).toString();
+      if (typeof value === 'boolean') {
+        return value.toString();
+      } else if (typeof value === 'number') {
+        return Boolean(value).toString();
+      }
+
+      return value;
     }
 
     if (type === 'number' && format === 'percent') {

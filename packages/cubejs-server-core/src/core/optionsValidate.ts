@@ -135,8 +135,17 @@ const schemaOptions = Joi.object().keys({
   dashboardAppPort: Joi.number(),
   sqlCache: Joi.boolean(),
   livePreview: Joi.boolean(),
+  // SQL API
+  sqlPort: Joi.number(),
+  pgSqlPort: Joi.number(),
+  sqlSuperUser: Joi.string(),
+  checkSqlAuth: Joi.func(),
+  canSwitchSqlUser: Joi.func(),
+  sqlUser: Joi.string(),
+  sqlPassword: Joi.string(),
   // Additional system flags
   serverless: Joi.boolean(),
+  allowNodeRequire: Joi.boolean(),
 });
 
 export default (options: any) => {

@@ -1,7 +1,7 @@
 /**
  * @title @cubejs-client/core
  * @permalink /@cubejs-client-core
- * @menuCategory Cube.js Frontend
+ * @menuCategory Frontend Integrations
  * @subcategory Reference
  * @menuOrder 2
  * @description Vanilla JavaScript Cube.js client.
@@ -79,6 +79,7 @@ declare module '@cubejs-client/core' {
     pollInterval?: number;
     credentials?: 'omit' | 'same-origin' | 'include';
     parseDateMeasures?: boolean;
+    resType?: 'default' | 'compact';
   };
 
   export type LoadMethodOptions = {
@@ -130,6 +131,12 @@ declare module '@cubejs-client/core' {
 
   type QueryType = 'regularQuery' | 'compareDateRangeQuery' | 'blendingQuery';
 
+  type LeafMeasure = {
+    measure: string;
+    additive: boolean;
+    type: 'count' | 'countDistinct' | 'sum' | 'min' | 'max' | 'number' | 'countDistinctApprox'
+  };
+
   export type TransformedQuery = {
     allFiltersWithinSelectedDimensions: boolean;
     granularityHierarchies: Record<string, string[]>;
@@ -141,6 +148,7 @@ declare module '@cubejs-client/core' {
     measures: string[];
     sortedDimensions: string[];
     sortedTimeDimensions: [[string, string]];
+    measureToLeafMeasures?: Record<string, LeafMeasure[]>;
   };
 
   export type PreAggregationType = 'rollup' | 'rollupJoin' | 'originalSql';
@@ -158,8 +166,10 @@ declare module '@cubejs-client/core' {
     external: boolean | null;
     dbType: string;
     extDbType: string;
+    requestId?: string;
     usedPreAggregations?: Record<string, UsedPreAggregation>;
     transformedQuery?: TransformedQuery;
+    total?: number
   };
 
   export type LoadResponse<T> = {
@@ -456,7 +466,7 @@ declare module '@cubejs-client/core' {
     /**
      * Base method for pivoting [ResultSet](#result-set) data.
      * Most of the times shouldn't be used directly and [chartPivot](#result-set-chart-pivot)
-     * or (tablePivot)[#table-pivot] should be used instead.
+     * or [tablePivot](#table-pivot) should be used instead.
      *
      * You can find the examples of using the `pivotConfig` [here](#types-pivot-config)
      * ```js
@@ -713,32 +723,40 @@ declare module '@cubejs-client/core' {
   }
 
   export type Filter = BinaryFilter | UnaryFilter | LogicalOrFilter | LogicalAndFilter;
-  type LogicalAndFilter = {
-    and: (BinaryFilter | UnaryFilter | LogicalOrFilter)[];
+  export type LogicalAndFilter = {
+    and: Filter[];
   };
 
-  type LogicalOrFilter = {
-    or: (BinaryFilter | UnaryFilter | LogicalAndFilter)[];
+  export type LogicalOrFilter = {
+    or: Filter[];
   };
 
-  type BinaryFilter = {
+  export interface BinaryFilter {
+    /**
+     * @deprecated Use `member` instead.
+     */
     dimension?: string;
     member?: string;
     operator: BinaryOperator;
     values: string[];
-  };
-  type UnaryFilter = {
+  }
+  export interface UnaryFilter {
+    /**
+     * @deprecated Use `member` instead.
+     */
     dimension?: string;
     member?: string;
     operator: UnaryOperator;
     values?: never;
-  };
-  type UnaryOperator = 'set' | 'notSet';
-  type BinaryOperator =
+  }
+  export type UnaryOperator = 'set' | 'notSet';
+  export type BinaryOperator =
     | 'equals'
     | 'notEquals'
     | 'contains'
     | 'notContains'
+    | 'startsWith'
+    | 'endsWith'
     | 'gt'
     | 'gte'
     | 'lt'
@@ -752,10 +770,10 @@ declare module '@cubejs-client/core' {
 
   export type DateRange = string | [string, string];
 
-  export type TimeDimensionBase = {
+  export interface TimeDimensionBase {
     dimension: string;
     granularity?: TimeDimensionGranularity;
-  };
+  }
 
   type TimeDimensionComparisonFields = {
     compareDateRange: Array<DateRange>;
@@ -770,19 +788,55 @@ declare module '@cubejs-client/core' {
 
   export type TimeDimension = TimeDimensionComparison | TimeDimensionRanged;
 
-  export type Query = {
+  type DeeplyReadonly<T> = {
+    readonly [K in keyof T]: DeeplyReadonly<T[K]>;
+  };
+
+  export interface Query {
     measures?: string[];
     dimensions?: string[];
     filters?: Filter[];
     timeDimensions?: TimeDimension[];
     segments?: string[];
-    limit?: number;
+    limit?: null | number;
     offset?: number;
     order?: TQueryOrderObject | TQueryOrderArray;
     timezone?: string;
     renewQuery?: boolean;
     ungrouped?: boolean;
-  };
+    responseFormat?: 'compact' | 'default';
+    total?: boolean;
+  }
+
+  export type QueryRecordType<T extends DeeplyReadonly<Query | Query[]>> =
+    T extends DeeplyReadonly<Query[]> ? QueryArrayRecordType<T> :
+    T extends DeeplyReadonly<Query> ? SingleQueryRecordType<T> :
+    never;
+
+  type QueryArrayRecordType<T extends DeeplyReadonly<Query[]>> =
+    T extends readonly [infer First, ...infer Rest]
+      ? SingleQueryRecordType<First> | QueryArrayRecordType<Rest>
+      : never;
+
+  // If we can't infer any members at all, then return any.
+  type SingleQueryRecordType<T extends DeeplyReadonly<Query>> = ExtractMembers<T> extends never
+    ? any
+    : { [K in string & ExtractMembers<T>]: string | number | boolean | null };
+
+  type ExtractMembers<T extends DeeplyReadonly<Query>> =
+    | ( T extends { dimensions: readonly (infer Names)[]; } ? Names : never )
+    | ( T extends { measures: readonly (infer Names)[]; } ? Names : never )
+    | ( T extends { timeDimensions: (infer U); } ? ExtractTimeMembers<U> : never );
+
+  type ExtractTimeMembers<T> =
+    T extends readonly [infer First, ...infer Rest]
+      ? ExtractTimeMember<First> | ExtractTimeMembers<Rest>
+      : never;
+
+  type ExtractTimeMember<T> =
+    T extends { dimension: infer Dimension, granularity: infer Granularity }
+      ? Dimension | `${Dimension & string}.${Granularity & string}`
+      : never;
 
   export class ProgressResult {
     stage(): string;
@@ -817,13 +871,14 @@ declare module '@cubejs-client/core' {
   type TCubeMemberType = 'time' | 'number' | 'string' | 'boolean';
 
   // @see BaseCubeMember
-  // @depreacated
+  // @deprecated
   export type TCubeMember = {
     type: TCubeMemberType;
     name: string;
     title: string;
     shortTitle: string;
     isVisible?: boolean;
+    meta?: any;
   };
 
   export type BaseCubeMember = {
@@ -832,6 +887,7 @@ declare module '@cubejs-client/core' {
     title: string;
     shortTitle: string;
     isVisible?: boolean;
+    meta?: any;
   };
 
   export type TCubeMeasure = BaseCubeMember & {
@@ -922,7 +978,7 @@ declare module '@cubejs-client/core' {
      * If empty query is provided no filtering is done based on query context and all available members are retrieved.
      * @param query - context query to provide filtering of members available to add to this query
      */
-    membersForQuery(query: Query | null, memberType: MemberType): TCubeMeasure[] | TCubeDimension[] | TCubeMember[];
+    membersForQuery(query: DeeplyReadonly<Query> | null, memberType: MemberType): TCubeMeasure[] | TCubeDimension[] | TCubeMember[];
 
     /**
      * Get meta information for a cube member
@@ -957,7 +1013,10 @@ declare module '@cubejs-client/core' {
    * @order 2
    */
   export class CubejsApi {
-    load(query: Query | Query[], options?: LoadMethodOptions): Promise<ResultSet>;
+    load<QueryType extends DeeplyReadonly<Query | Query[]>>(
+      query: QueryType,
+      options?: LoadMethodOptions,
+    ): Promise<ResultSet<QueryRecordType<QueryType>>>;
     /**
      * Fetch data for the passed `query`.
      *
@@ -982,7 +1041,18 @@ declare module '@cubejs-client/core' {
      * ```
      * @param query - [Query object](query-format)
      */
-    load(query: Query | Query[], options?: LoadMethodOptions, callback?: LoadMethodCallback<ResultSet>): void;
+    load<QueryType extends DeeplyReadonly<Query | Query[]>>(
+      query: QueryType,
+      options?: LoadMethodOptions,
+      callback?: LoadMethodCallback<ResultSet<QueryRecordType<QueryType>>>,
+    ): void;
+
+    load<QueryType extends DeeplyReadonly<Query | Query[]>>(
+      query: QueryType,
+      options?: LoadMethodOptions,
+      callback?: LoadMethodCallback<ResultSet>,
+      responseFormat?: string
+    ): Promise<ResultSet<QueryRecordType<QueryType>>>;
 
     /**
      * Allows you to fetch data and receive updates over time. See [Real-Time Data Fetch](real-time-data-fetch)
@@ -1008,14 +1078,18 @@ declare module '@cubejs-client/core' {
      * );
      * ```
      */
-    subscribe(query: Query | Query[], options: LoadMethodOptions | null, callback: LoadMethodCallback<ResultSet>): void;
+    subscribe<QueryType extends DeeplyReadonly<Query | Query[]>>(
+      query: QueryType,
+      options: LoadMethodOptions | null,
+      callback: LoadMethodCallback<ResultSet<QueryRecordType<QueryType>>>,
+    ): void;
 
-    sql(query: Query | Query[], options?: LoadMethodOptions): Promise<SqlQuery>;
+    sql(query: DeeplyReadonly<Query | Query[]>, options?: LoadMethodOptions): Promise<SqlQuery>;
     /**
      * Get generated SQL string for the given `query`.
      * @param query - [Query object](query-format)
      */
-    sql(query: Query | Query[], options?: LoadMethodOptions, callback?: LoadMethodCallback<SqlQuery>): void;
+    sql(query: DeeplyReadonly<Query | Query[]>, options?: LoadMethodOptions, callback?: LoadMethodCallback<SqlQuery>): void;
 
     meta(options?: LoadMethodOptions): Promise<Meta>;
     /**
@@ -1023,11 +1097,11 @@ declare module '@cubejs-client/core' {
      */
     meta(options?: LoadMethodOptions, callback?: LoadMethodCallback<Meta>): void;
 
-    dryRun(query: Query | Query[], options?: LoadMethodOptions): Promise<DryRunResponse>;
+    dryRun(query: DeeplyReadonly<Query | Query[]>, options?: LoadMethodOptions): Promise<DryRunResponse>;
     /**
      * Get query related meta without query execution
      */
-    dryRun(query: Query | Query[], options: LoadMethodOptions, callback?: LoadMethodCallback<DryRunResponse>): void;
+    dryRun(query: DeeplyReadonly<Query | Query[]>, options: LoadMethodOptions, callback?: LoadMethodCallback<DryRunResponse>): void;
   }
 
   /**
@@ -1051,7 +1125,7 @@ declare module '@cubejs-client/core' {
    * );
    * ```
    *
-   * @param apiToken - [API token](security) is used to authorize requests and determine SQL database you're accessing. In the development mode, Cube.js Backend will print the API token to the console on on startup. In case of async function `authorization` is updated for `options.transport` on each request.
+   * @param apiToken - [API token](security) is used to authorize requests and determine SQL database you're accessing. In the development mode, Cube.js Backend will print the API token to the console on startup. In case of async function `authorization` is updated for `options.transport` on each request.
    * @order 1
    */
   export default function cubejs(apiToken: string | (() => Promise<string>), options: CubeJSApiOptions): CubejsApi;
@@ -1089,7 +1163,7 @@ declare module '@cubejs-client/core' {
   /**
    * @hidden
    */
-  export function isQueryPresent(query: Query | Query[] | null | undefined): boolean;
+  export function isQueryPresent(query: DeeplyReadonly<Query | Query[]> | null | undefined): boolean;
   export function movePivotItem(
     pivotConfig: PivotConfig,
     sourceIndex: number,
@@ -1102,14 +1176,17 @@ declare module '@cubejs-client/core' {
    */
   export function moveItemInArray<T = any>(list: T[], sourceIndex: number, destinationIndex: number): T[];
 
-  export function defaultOrder(query: Query): { [key: string]: QueryOrder };
+  export function defaultOrder(query: DeeplyReadonly<Query>): { [key: string]: QueryOrder };
 
-  type TFlatFilter = {
+  export interface TFlatFilter {
+    /**
+     * @deprecated Use `member` instead.
+     */
     dimension?: string;
     member?: string;
     operator: BinaryOperator;
     values: string[];
-  };
+  }
 
   /**
    * @hidden
@@ -1133,9 +1210,11 @@ declare module '@cubejs-client/core' {
   /**
    * @hidden
    */
-  export function getQueryMembers(query: Query): string[];
+  export function getQueryMembers(query: DeeplyReadonly<Query>): string[];
 
-  export function areQueriesEqual(query1: Query | null, query2: Query | null): boolean;
+  export function areQueriesEqual(query1: DeeplyReadonly<Query> | null, query2: DeeplyReadonly<Query> | null): boolean;
+  
+  export function validateQuery(query: DeeplyReadonly<Query> | null | undefined): Query;
 
   export type ProgressResponse = {
     stage: string;

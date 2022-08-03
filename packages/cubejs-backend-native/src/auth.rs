@@ -1,13 +1,17 @@
 use async_trait::async_trait;
 use cubesql::{
     di_service,
-    mysql::{AuthContext, SqlAuthService},
+    sql::{AuthContext, AuthenticateResponse, SqlAuthService},
+    transport::LoadRequestMeta,
     CubeError,
 };
 use log::trace;
 use neon::prelude::*;
+use serde::Deserialize;
 use serde_derive::Serialize;
+use std::any::Any;
 use std::sync::Arc;
+use uuid::Uuid;
 
 use crate::channel::call_js_with_channel_as_callback;
 
@@ -27,19 +31,50 @@ impl NodeBridgeAuthService {
 }
 
 #[derive(Debug, Serialize)]
+pub struct TransportRequest {
+    pub id: String,
+    pub meta: Option<LoadRequestMeta>,
+}
+
+#[derive(Debug, Serialize)]
 struct CheckAuthRequest {
-    authorization: Option<String>,
+    request: TransportRequest,
+    user: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CheckAuthResponse {
+    password: Option<String>,
+    superuser: bool,
+}
+
+#[derive(Debug)]
+pub struct NativeAuthContext {
+    pub user: Option<String>,
+    pub superuser: bool,
+}
+
+impl AuthContext for NativeAuthContext {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 #[async_trait]
 impl SqlAuthService for NodeBridgeAuthService {
-    async fn authenticate(&self, user: Option<String>) -> Result<AuthContext, CubeError> {
+    async fn authenticate(&self, user: Option<String>) -> Result<AuthenticateResponse, CubeError> {
         trace!("[auth] Request ->");
 
+        let request_id = Uuid::new_v4().to_string();
+
         let extra = serde_json::to_string(&CheckAuthRequest {
-            authorization: user.clone(),
+            request: TransportRequest {
+                id: format!("{}-span-1", request_id),
+                meta: None,
+            },
+            user: user.clone(),
         })?;
-        let response: serde_json::Value = call_js_with_channel_as_callback(
+        let response: CheckAuthResponse = call_js_with_channel_as_callback(
             self.channel.clone(),
             self.check_auth.clone(),
             Some(extra),
@@ -47,16 +82,12 @@ impl SqlAuthService for NodeBridgeAuthService {
         .await?;
         trace!("[auth] Request <- {:?}", response);
 
-        let is_auth = response.as_bool().unwrap_or(false);
-
-        Ok(AuthContext {
-            password: if !is_auth {
-                Some("wrong password to user".to_string())
-            } else {
-                None
-            },
-            access_token: user.unwrap_or("fake".to_string()),
-            base_path: "fake".to_string(),
+        Ok(AuthenticateResponse {
+            context: Arc::new(NativeAuthContext {
+                user,
+                superuser: response.superuser,
+            }),
+            password: response.password,
         })
     }
 }

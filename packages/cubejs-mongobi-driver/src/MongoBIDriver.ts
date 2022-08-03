@@ -6,15 +6,22 @@ import {
   DriverInterface, StreamOptions,
 } from '@cubejs-backend/query-orchestrator';
 import { Readable } from 'stream';
-import moment from 'moment';
 
 import { getNativeTypeName } from './MySQLType';
 
 export interface MongoBIDriverConfiguration extends ConnectionOptions {
   storeTimezone?: string;
+  maxPoolSize?: number;
 }
 
 export class MongoBIDriver extends BaseDriver implements DriverInterface {
+  /**
+   * Returns default concurrency value.
+   */
+  public static getDefaultConcurrency(): number {
+    return 2;
+  }
+
   protected readonly config: MongoBIDriverConfiguration;
 
   protected readonly pool: Pool<Connection>;
@@ -38,8 +45,8 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
       typeCast: (field: Field, next) => {
         if (field.type === 'DATETIME') {
           // Example value 1998-08-02 00:00:00
-          return moment.utc(field.string())
-            .format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
+          // Here we just omit Date parsing and avoiding Date.toString() done by driver. MongoBI original format is just fine.
+          return field.string();
         }
 
         return next();
@@ -75,7 +82,7 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
       }
     }, {
       min: 0,
-      max: 8,
+      max: this.config.maxPoolSize || 8,
       evictionRunIntervalMillis: 10000,
       softIdleTimeoutMillis: 30000,
       idleTimeoutMillis: 30000,
@@ -221,7 +228,11 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
   }
 
   public informationSchemaQuery() {
-    return `${super.informationSchemaQuery()} AND columns.table_schema = '${this.config.database}'`;
+    if (this.config.database) {
+      return `${super.informationSchemaQuery()} AND columns.table_schema = '${this.config.database}'`;
+    } else {
+      return super.informationSchemaQuery();
+    }
   }
 
   public quoteIdentifier(identifier: string) {

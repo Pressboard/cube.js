@@ -135,22 +135,24 @@ export class ServerContainer {
       return;
     }
 
-    /**
-     * It's needed to detect case when user didnt install @cubejs-backend/server, but
-     * install @cubejs-backend/postgres-driver and it doesn't fit to built-in server
-     */
-    const depsToCompareVersions = Object.keys(manifest.devDependencies).filter(
-      isCubeNotServerPackage
-    );
-    // eslint-disable-next-line no-restricted-syntax
-    for (const pkgName of depsToCompareVersions) {
-      const pkgVersion = safetyParseSemver(
-        lock.resolveVersion(pkgName)
+    if (manifest.devDependencies) {
+      /**
+       * It's needed to detect case when user didnt install @cubejs-backend/server, but
+       * install @cubejs-backend/postgres-driver and it doesn't fit to built-in server
+       */
+      const depsToCompareVersions = Object.keys(manifest.devDependencies).filter(
+        isCubeNotServerPackage
       );
-      if (pkgVersion) {
-        this.compareBuiltInAndUserVersions(builtInCoreVersion, pkgVersion);
+      // eslint-disable-next-line no-restricted-syntax
+      for (const pkgName of depsToCompareVersions) {
+        const pkgVersion = safetyParseSemver(
+          lock.resolveVersion(pkgName)
+        );
+        if (pkgVersion) {
+          this.compareBuiltInAndUserVersions(builtInCoreVersion, pkgVersion);
 
-        return;
+          return;
+        }
       }
     }
   }
@@ -358,7 +360,7 @@ export class ServerContainer {
       let shutdownHandler: Promise<0 | 1> | null = null;
       let killSignalCount = 0;
 
-      const signalToShutdown = [
+      const signalToShutdown: NodeJS.Signals[] = [
         // Signal Terminate - graceful shutdown in Unix systems
         'SIGTERM',
         // Ctrl+C

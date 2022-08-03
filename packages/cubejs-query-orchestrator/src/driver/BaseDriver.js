@@ -92,8 +92,7 @@ export class BaseDriver {
    *
    * @param {Object} [options]
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  constructor(options) {
+  constructor(_options = {}) {
     //
   }
 
@@ -104,7 +103,7 @@ export class BaseDriver {
              columns.table_schema as ${this.quoteIdentifier('table_schema')},
              columns.data_type as ${this.quoteIdentifier('data_type')}
       FROM information_schema.columns
-      WHERE columns.table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
+      WHERE columns.table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')
    `;
   }
 
@@ -187,7 +186,7 @@ export class BaseDriver {
    * @param {any} [options]
    * @return {Promise<Array<any>>}
    */
-  async query(query, values, options) {
+  async query(_query, _values, _options = {}) {
     throw new Error('Not implemented');
   }
 
@@ -195,7 +194,7 @@ export class BaseDriver {
    * @public
    * @return {Promise<any>}
    */
-  async downloadQueryResults(query, values, options) {
+  async downloadQueryResults(query, values, _options) {
     const rows = await this.query(query, values);
     if (rows.length === 0) {
       throw new Error(
@@ -286,7 +285,7 @@ export class BaseDriver {
    * @param {number} paramIndex
    * @return {string}
    */
-  param(paramIndex) {
+  param(_paramIndex) {
     return '?';
   }
 
@@ -294,16 +293,15 @@ export class BaseDriver {
     return 10000;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async downloadTable(table, options) {
+  async downloadTable(table, _options) {
     return { rows: await this.query(`SELECT * FROM ${table}`) };
   }
 
   async uploadTable(table, columns, tableData) {
-    return this.uploadTableWithIndexes(table, columns, tableData, []);
+    return this.uploadTableWithIndexes(table, columns, tableData, [], null);
   }
 
-  async uploadTableWithIndexes(table, columns, tableData, indexesSql) {
+  async uploadTableWithIndexes(table, columns, tableData, indexesSql, _uniqueKeyColumns, _queryTracingObj) {
     if (!tableData.rows) {
       throw new Error(`${this.constructor} driver supports only rows upload`);
     }
@@ -328,8 +326,7 @@ export class BaseDriver {
     }
   }
 
-  // eslint-disable-next-line no-unused-vars
-  toColumnValue(value, genericType) {
+  toColumnValue(value, _genericType) {
     return value;
   }
 
@@ -420,5 +417,9 @@ export class BaseDriver {
 
   capabilities() {
     return {};
+  }
+
+  nowTimestamp() {
+    return Date.now();
   }
 }

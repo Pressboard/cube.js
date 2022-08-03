@@ -5,6 +5,14 @@ category: Deployment
 menuOrder: 2
 ---
 
+<InfoBox>
+
+Thinking of migrating to the cloud instead? [Click
+here][blog-migrate-to-cube-cloud] to learn more about migrating a self-hosted
+installation to [Cube Cloud][link-cube-cloud].
+
+</InfoBox>
+
 This is a checklist for configuring and securing Cube.js for a production
 deployment.
 
@@ -61,6 +69,14 @@ configured database][ref-config-connect-db] to set it up.
 </InfoBox>
 
 ## Set up Redis
+
+<WarningBox>
+
+Cube Store [will replace
+Redis][replace-redis] for in-memory cache and queue management in late
+2022.
+
+</WarningBox>
 
 Cube.js requires [Redis](https://redis.io/), an in-memory data structure store,
 to run in production.
@@ -137,9 +153,12 @@ your monitoring service of choice to use the [`/readyz`][ref-api-readyz] and
 [`/livez`][ref-api-livez] API endpoints so you can check on the Cube.js
 deployment's health and be alerted to any issues.
 
+[blog-migrate-to-cube-cloud]:
+  https://cube.dev/blog/migrating-from-self-hosted-to-cube-cloud/
 [gh-ioredis]: https://github.com/luin/ioredis
 [gh-node-redis]: https://github.com/NodeRedis/node-redis
 [link-caddy]: https://caddyserver.com/
+[link-cube-cloud]: https://cubecloud.dev
 [link-cubejs-dev-vs-prod]: /configuration/overview#development-mode
 [link-k8s-healthcheck-api]:
   https://kubernetes.io/docs/reference/using-api/health-checks/
@@ -157,3 +176,4 @@ deployment's health and be alerted to any issues.
 [ref-config-env-vars-general]: /reference/environment-variables#general
 [ref-api-readyz]: /rest-api#readyz
 [ref-api-livez]: /rest-api#livez
+[replace-redis]: https://cube.dev/blog/replacing-redis-with-cube-store

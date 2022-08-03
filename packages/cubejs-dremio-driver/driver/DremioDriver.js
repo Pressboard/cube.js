@@ -16,6 +16,13 @@ class DremioDriver extends BaseDriver {
     return DremioQuery;
   }
 
+  /**
+   * Returns default concurrency value.
+   */
+  static getDefaultConcurrency() {
+    return 2;
+  }
+
   constructor(config = {}) {
     super();
 
@@ -27,7 +34,7 @@ class DremioDriver extends BaseDriver {
       database: config.database || process.env.CUBEJS_DB_NAME,
       ssl: config.ssl || process.env.CUBEJS_DB_SSL,
       ...config,
-      pollTimeout: (config.pollTimeout || getEnv('dbPollTimeout')) * 1000,
+      pollTimeout: (config.pollTimeout || getEnv('dbPollTimeout') || getEnv('dbQueryTimeout')) * 1000,
       pollMaxInterval: (config.pollMaxInterval || getEnv('dbPollMaxInterval')) * 1000,
     };
 

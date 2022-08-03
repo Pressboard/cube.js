@@ -19,11 +19,19 @@ interface BigQueryDriverOptions extends BigQueryOptions {
   location?: string,
   pollTimeout?: number,
   pollMaxInterval?: number,
+  maxPoolSize?: number,
 }
 
 type BigQueryDriverOptionsInitialized = Required<BigQueryDriverOptions, 'pollTimeout' | 'pollMaxInterval'>;
 
 export class BigQueryDriver extends BaseDriver implements DriverInterface {
+  /**
+   * Returns default concurrency value.
+   */
+  public static getDefaultConcurrency(): number {
+    return 10;
+  }
+
   protected readonly options: BigQueryDriverOptionsInitialized;
 
   protected readonly bigquery: BigQuery;
@@ -45,7 +53,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       exportBucket: getEnv('dbExportBucket') || process.env.CUBEJS_DB_BQ_EXPORT_BUCKET,
       location: getEnv('bigQueryLocation'),
       ...config,
-      pollTimeout: (config.pollTimeout || getEnv('dbPollTimeout')) * 1000,
+      pollTimeout: (config.pollTimeout || getEnv('dbPollTimeout') || getEnv('dbQueryTimeout')) * 1000,
       pollMaxInterval: (config.pollMaxInterval || getEnv('dbPollMaxInterval')) * 1000,
     };
 
@@ -258,6 +266,8 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
         Math.min(this.options.pollMaxInterval, 200 * i),
       );
     }
+
+    await job.cancel();
 
     throw new Error(
       `BigQuery job timeout reached ${this.options.pollTimeout}ms`,

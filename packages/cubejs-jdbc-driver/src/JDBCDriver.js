@@ -12,18 +12,25 @@ const DriverManager = require('jdbc/lib/drivermanager');
 const Connection = require('jdbc/lib/connection');
 const DatabaseMetaData = require('jdbc/lib/databasemetadata');
 const jinst = require('jdbc/lib/jinst');
-const mvn = promisify(require('node-java-maven'));
+const mvn = require('node-java-maven');
 
 let mvnPromise = null;
 
 const initMvn = (customClassPath) => {
   if (!mvnPromise) {
-    mvnPromise = mvn().then((mvnResults) => {
-      if (!jinst.isJvmCreated()) {
-        jinst.addOption('-Xrs');
-        const classPath = mvnResults.classpath.concat(customClassPath || []);
-        jinst.setupClasspath(classPath);
-      }
+    mvnPromise = new Promise((resolve, reject) => {
+      mvn((err, mvnResults) => {
+        if (err && !err.message.includes('Could not find java property')) {
+          reject(err);
+        } else {
+          if (!jinst.isJvmCreated()) {
+            jinst.addOption('-Xrs');
+            const classPath = (mvnResults && mvnResults.classpath || []).concat(customClassPath || []);
+            jinst.setupClasspath(classPath);
+          }
+          resolve();
+        }
+      });
     });
   }
   return mvnPromise;
@@ -89,7 +96,9 @@ export class JDBCDriver extends BaseDriver {
       }
     }, {
       min: 0,
-      max: process.env.CUBEJS_DB_MAX_POOL && parseInt(process.env.CUBEJS_DB_MAX_POOL, 10) || 8,
+      max:
+        process.env.CUBEJS_DB_MAX_POOL && parseInt(process.env.CUBEJS_DB_MAX_POOL, 10) ||
+        this.config.maxPoolSize || 8,
       evictionRunIntervalMillis: 10000,
       softIdleTimeoutMillis: 30000,
       idleTimeoutMillis: 30000,
@@ -126,8 +135,19 @@ export class JDBCDriver extends BaseDriver {
    * @public
    * @return {Promise<*>}
    */
-  testConnection() {
-    return this.query('SELECT 1', []);
+  async testConnection() {
+    let err;
+    let connection;
+    try {
+      connection = await this.pool._factory.create();
+    } catch (e) {
+      err = e.message;
+    }
+    if (err) {
+      throw new Error(err);
+    } else {
+      await this.pool._factory.destroy(connection);
+    }
   }
 
   /**

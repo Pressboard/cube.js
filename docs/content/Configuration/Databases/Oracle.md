@@ -3,6 +3,10 @@ title: Oracle
 permalink: /config/databases/oracle
 ---
 
+<WarningBox>
+  The driver for Oracle is <a href="../databases#driver-support">community-supported</a> and is not supported by Cube or the vendor. 
+</WarningBox>
+
 ## Prerequisites
 
 - The hostname for the [Oracle][oracle] database server
@@ -11,7 +15,7 @@ permalink: /config/databases/oracle
 
 ## Setup
 
-### <--{"id" : "Setup"}-->  Manual
+### <--{"id" : "Setup"}--> Manual
 
 Add the following to a `.env` file in your Cube.js project:
 

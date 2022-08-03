@@ -3,6 +3,170 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.29](https://github.com/cube-js/cube.js/compare/v0.30.28...v0.30.29) (2022-07-01)
+
+**Note:** Version bump only for package @cubejs-client/vue
+
+
+
+
+
+## [0.30.27](https://github.com/cube-js/cube.js/compare/v0.30.26...v0.30.27) (2022-06-24)
+
+
+### Bug Fixes
+
+* **client-vue:** Fix boolean operator in filter without using builderProps ([#4782](https://github.com/cube-js/cube.js/issues/4782)) ([904171e](https://github.com/cube-js/cube.js/commit/904171ee85185f1ba1fcf812ba58ae6bc11b8407))
+
+
+
+
+
+## [0.30.4](https://github.com/cube-js/cube.js/compare/v0.30.3...v0.30.4) (2022-05-20)
+
+**Note:** Version bump only for package @cubejs-client/vue
+
+
+
+
+
+# [0.30.0](https://github.com/cube-js/cube.js/compare/v0.29.57...v0.30.0) (2022-05-11)
+
+**Note:** Version bump only for package @cubejs-client/vue
+
+
+
+
+
+## [0.29.54](https://github.com/cube-js/cube.js/compare/v0.29.53...v0.29.54) (2022-05-03)
+
+**Note:** Version bump only for package @cubejs-client/vue
+
+
+
+
+
+## [0.29.53](https://github.com/cube-js/cube.js/compare/v0.29.52...v0.29.53) (2022-04-29)
+
+
+### Features
+
+* **client-vue:** boolean filters support ([#4314](https://github.com/cube-js/cube.js/issues/4314)) ([8a3bb3d](https://github.com/cube-js/cube.js/commit/8a3bb3dc8e427c30d2ac0cdd504662087dcf1e19))
+
+
+
+
+
+## [0.29.51](https://github.com/cube-js/cube.js/compare/v0.29.50...v0.29.51) (2022-04-22)
+
+**Note:** Version bump only for package @cubejs-client/vue
+
+
+
+
+
+## [0.29.48](https://github.com/cube-js/cube.js/compare/v0.29.47...v0.29.48) (2022-04-14)
+
+**Note:** Version bump only for package @cubejs-client/vue
+
+
+
+
+
+## [0.29.43](https://github.com/cube-js/cube.js/compare/v0.29.42...v0.29.43) (2022-04-07)
+
+**Note:** Version bump only for package @cubejs-client/vue
+
+
+
+
+
+## [0.29.42](https://github.com/cube-js/cube.js/compare/v0.29.41...v0.29.42) (2022-04-04)
+
+**Note:** Version bump only for package @cubejs-client/vue
+
+
+
+
+
+## [0.29.33](https://github.com/cube-js/cube.js/compare/v0.29.32...v0.29.33) (2022-03-17)
+
+**Note:** Version bump only for package @cubejs-client/vue
+
+
+
+
+
+## [0.29.29](https://github.com/cube-js/cube.js/compare/v0.29.28...v0.29.29) (2022-03-03)
+
+**Note:** Version bump only for package @cubejs-client/vue
+
+
+
+
+
+## [0.29.23](https://github.com/cube-js/cube.js/compare/v0.29.22...v0.29.23) (2022-01-26)
+
+**Note:** Version bump only for package @cubejs-client/vue
+
+
+
+
+
+## [0.29.8](https://github.com/cube-js/cube.js/compare/v0.29.7...v0.29.8) (2021-12-21)
+
+
+### Bug Fixes
+
+* **@cubejs-client/vue:** fix error when executing deletion ([#3806](https://github.com/cube-js/cube.js/issues/3806)) Thanks [@18207680061](https://github.com/18207680061)! ([9d220a8](https://github.com/cube-js/cube.js/commit/9d220a8cf3bf040b51efefb9f74beb5545a89035))
+
+
+
+
+
+## [0.29.5](https://github.com/cube-js/cube.js/compare/v0.29.4...v0.29.5) (2021-12-17)
+
+**Note:** Version bump only for package @cubejs-client/vue
+
+
+
+
+
+# [0.29.0](https://github.com/cube-js/cube.js/compare/v0.28.67...v0.29.0) (2021-12-14)
+
+**Note:** Version bump only for package @cubejs-client/vue
+
+
+
+
+
+## [0.28.66](https://github.com/cube-js/cube.js/compare/v0.28.65...v0.28.66) (2021-12-14)
+
+
+### Bug Fixes
+
+* **client-vue:** add wrapWithQueryRenderer prop ([#3801](https://github.com/cube-js/cube.js/issues/3801)) ([c211e0a](https://github.com/cube-js/cube.js/commit/c211e0a0b1d260167128edf07b725c905f0dc63e))
+
+
+
+
+
+## [0.28.52](https://github.com/cube-js/cube.js/compare/v0.28.51...v0.28.52) (2021-11-03)
+
+**Note:** Version bump only for package @cubejs-client/vue
+
+
+
+
+
+## [0.28.45](https://github.com/cube-js/cube.js/compare/v0.28.44...v0.28.45) (2021-10-19)
+
+**Note:** Version bump only for package @cubejs-client/vue
+
+
+
+
+
 ## [0.28.39](https://github.com/cube-js/cube.js/compare/v0.28.38...v0.28.39) (2021-09-22)
 
 

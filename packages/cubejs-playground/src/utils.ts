@@ -1,7 +1,32 @@
+import { Meta } from '@cubejs-client/core';
 import { notification } from 'antd';
 import { pretty } from 'js-object-pretty-print';
 
 import { PlaygroundEvent } from './types';
+
+export type MemberTypeMap = Record<string, 'time' | 'number' | 'string'>;
+
+export function metaToTypes(meta: Meta) {
+  const types: MemberTypeMap = {};
+
+  Object.values(meta.cubesMap).forEach((membersByType) => {
+    Object.values(membersByType).forEach((members) => {
+      Object.values<any>(members).forEach(({ name, type }) => {
+        types[name] = type;
+      });
+    });
+  });
+
+  return types;
+}
+
+export function unCapitalize(name: string) {
+  return `${name[0].toLowerCase()}${name.slice(1)}`;
+}
+
+export function uniqArray<T = any>(array: T[]) {
+  return Array.from(new Set(array));
+}
 
 const bootstrapDefinition = {
   'angular-cli': {
@@ -70,6 +95,13 @@ const peerDependencies = {
   'react-chartjs-2': 'chart.js',
 };
 
+const fixes = {
+  'react': '17.0.1',
+  'react-dom': '17.0.1',
+  'react-chartjs-2': '3.0.3',
+  'chart.js': '3.4.0'
+};
+
 export function codeSandboxDefinition(template, files, dependencies = []) {
   return {
     files: {
@@ -82,7 +114,7 @@ export function codeSandboxDefinition(template, files, dependencies = []) {
           dependencies: {
             ...bootstrapDefinition[template]?.dependencies,
             ...dependencies.reduce((memo, d) => {
-              const [name, version] = Array.isArray(d) ? d : [d, 'latest'];
+              const [name, version] = Array.isArray(d) ? d : [d, fixes[d] || 'latest'];
 
               return {
                 ...memo,
@@ -108,7 +140,7 @@ export function dispatchPlaygroundEvent(
   if (!document) {
     return;
   }
-
+  
   const myEvent = new CustomEvent('__cubejsPlaygroundEvent', {
     bubbles: true,
     composed: true,
@@ -189,7 +221,7 @@ export async function copyToClipboard(value, message = 'Copied to clipboard') {
     notification.success({
       message,
     });
-  } catch (e) {
+  } catch (e: any) {
     notification.error({
       message: "Can't copy to clipboard",
       description: e,

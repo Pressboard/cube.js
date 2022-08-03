@@ -1,5 +1,6 @@
 export const preAggregationsResultFactory = () => ([
   {
+    id: 'Usage.usages',
     preAggregationName: 'usages',
     preAggregation: {
       type: 'rollup',
@@ -29,32 +30,9 @@ export const preAggregationPartitionsResultFactory = () => ([
   {
     timezone: 'UTC',
     preAggregation: preAggregationsResultFactory()[0],
-    partitions: [
-      {
-        timezone: 'UTC',
-        dimensions: [
-          'Usage.deploymentId',
-          'Usage.tenantId'
-        ],
-        measures: [
-          'Usage.count'
-        ],
-        timeDimensions: [
-          {
-            dimension: 'Usage.createdAt',
-            granularity: 'day',
-            dateRange: [
-              '2021-04-30T00:00:00.000',
-              '2021-04-30T23:59:59.999'
-            ]
-          }
-        ],
-        rollups: [],
-        sql: {
-          tableName: 'dev_pre_aggregations.usage_usages20210430'
-        }
-      }
-    ]
+    partitions: [{
+      tableName: 'dev_pre_aggregations.usage_usages20210430'
+    }]
   }
 ]);
 
@@ -114,6 +92,43 @@ export const compilerApi = jest.fn().mockImplementation(() => ({
         },
       },
     ];
+  },
+
+  async metaConfigExtended() {
+    const metaConfig = [
+      {
+        config: {
+          name: 'Foo',
+          measures: [
+            {
+              name: 'Foo.bar',
+              sql: 'bar',
+            },
+          ],
+          dimensions: [
+            {
+              name: 'Foo.id',
+            },
+            {
+              name: 'Foo.time',
+            },
+          ],
+        },
+      },
+    ];
+
+    const cubeDefinitions = {
+      Foo: {
+        sql: () => 'SELECT * FROM Foo',
+        measures: {},
+        dimension: {},
+      }
+    };
+
+    return {
+      metaConfig,
+      cubeDefinitions,
+    };
   },
 
   async preAggregations() {

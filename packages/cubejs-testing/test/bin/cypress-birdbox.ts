@@ -10,7 +10,8 @@ import { startBirdBoxFromContainer } from '../../src';
 
   try {
     birdbox = await startBirdBoxFromContainer({
-      name,
+      type: name,
+      loadScript: 'load.sh'
     });
   } catch (e) {
     console.log(e);

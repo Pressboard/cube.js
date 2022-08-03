@@ -3,11 +3,15 @@ title: SQLite
 permalink: /config/databases/sqlite
 ---
 
+<WarningBox>
+  The driver for SQLite is <a href="../databases#driver-support">community-supported</a> and is not supported by Cube or the vendor. 
+</WarningBox>
+
 ## Prerequisites
 
 ## Setup
 
-### <--{"id" : "Setup"}-->  Manual
+### <--{"id" : "Setup"}--> Manual
 
 Add the following to a `.env` file in your Cube.js project:
 

@@ -4,7 +4,7 @@ import { Input, Menu } from 'antd';
 import { useLayoutEffect } from 'react';
 import styled from 'styled-components';
 
-import useDeepMemo from '../../../hooks/deep-memo';
+import { useDeepMemo } from '../../../hooks/deep-memo';
 import { getMembersByCube, MembersByCube } from '../../../shared/helpers';
 import { QueryMemberKey } from '../../../types';
 import { useCubeMemberSearch } from './cube-member-search';
@@ -15,6 +15,7 @@ const StyledMenu = styled(Menu)`
   position: relative;
   max-height: 600px;
   overflow-y: scroll;
+  overflow-x: hidden;
 
   li {
     font-size: var(--font-size-base);
@@ -170,7 +171,7 @@ export function Cubes({
         openKeys={search ? allCubeKeys : openKeys}
         mode="inline"
         onClick={(event) => {
-          const { membertype } = (event.domEvent.target as HTMLElement).dataset;
+          const { membertype } = (event.domEvent.currentTarget as HTMLElement).dataset;
 
           onSelect(
             membertype as QueryMemberKey,
